@@ -1,0 +1,9 @@
+# Editor/system
+.vscode/*
+!.vscode/settings.json
+.DS_Store
+
+# pytest cache
+.pytest_cache/
+**/.pytest_cache/
+**.egg-info
