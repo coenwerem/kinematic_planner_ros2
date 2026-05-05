@@ -10,7 +10,7 @@ The planner supports any N-DOF robot whose links use **convex collision primitiv
 
 ---
 
-## What this demonstrates
+## Components
 
 | Capability | Implementation |
 |---|---|
@@ -22,7 +22,7 @@ The planner supports any N-DOF robot whose links use **convex collision primitiv
 
 ---
 
-## Workspace layout
+## Workspace Layout
 
 ```
 kinematic_planner_ros2/
