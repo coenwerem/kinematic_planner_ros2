@@ -1,10 +1,8 @@
 # kinematic_planner_ros2
 
-A standalone ROS 2 workspace implementing **RRT\*** and **Informed RRT\*** path planning for
-robot manipulators, built without MoveIt.  Collision checking uses the
+A suite of ROS 2 packages implementing standalone collision-free **RRT\*** and **Informed RRT\*** path planning for robot manipulators, built from the ground-up to serve as an educational complement of the more feature-rich and standard motion planning framework, [MoveIt](https://github.com/moveit/moveit2).  Collision checking uses the
 [Flexible Collision Library (FCL)](https://github.com/humanoid-path-planner/hpp-fcl) directly.
-Forward kinematics use the [Robotics Toolbox for Python](https://github.com/petercorke/robotics-toolbox-python).
-The robot is described entirely by a URDF — no SRDF, no MoveIt config package required.
+Forward kinematics use the [Robotics Toolbox for Python](https://github.com/petercorke/robotics-toolbox-python), and the robot is described entirely by a URDF.
 
 The included example robot is a 3-DOF serial manipulator (3R arm).
 The planner supports any N-DOF robot whose links use **convex collision primitives**

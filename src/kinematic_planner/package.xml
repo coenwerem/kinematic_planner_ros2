@@ -5,10 +5,9 @@
   <version>0.1.0</version>
   <description>
     Standalone collision-free kinematic planner using sampling-based methods (RRT*, Informed RRT*).
-    Supports any N-DOF robot whose links use convex collision primitives (box, cylinder, sphere).
-    No MoveIt dependency — robot is fully specified via a URDF string parameter.
+    Supports any N-DOF robot whose links use convex collision primitives (box, cylinder, sphere). Note that this package has been designed to not have any dependency on MoveIt on purpose to expose the internals of a typical kinematic motion planner and serve as a pedagogical complement to aid in understanding the inner workings of the more robust and feature-rich MoveIt framework or other large-scale planning systems, e.g., OMPL. As a consequence, we constrain robot descriptions to be specified only in the URDF.
   </description>
-  <maintainer email="robotdevx@gmail.com">Clinton Enwerem</maintainer>
+  <maintainer email="me@clintonenwerem.com">Clinton Enwerem</maintainer>
   <license>MIT</license>
 
   <depend>rclpy</depend>

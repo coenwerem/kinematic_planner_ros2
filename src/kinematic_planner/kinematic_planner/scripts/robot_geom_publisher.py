@@ -4,7 +4,7 @@
 Robot geometry publisher — parses URDF collision geometry and publishes RigidBodyGeom messages.
 
 All robot metadata (base link name, world frame, joint map) is derived directly from the
-`robot_description` ROS2 parameter. No MoveIt, no external robot module required.
+`robot_description` ROS2 parameter. No external robot module required.
 
 Author: Clinton Enwerem
 """

@@ -4,7 +4,7 @@
 ROS 2 node: collision-free trajectory planning via RRT*.
 
 Accepts any N-DOF robot whose URDF uses convex collision primitives (box, cylinder, sphere).
-Robot model is supplied entirely through the `robot_description` ROS2 parameter — no MoveIt
+Robot model is supplied entirely through the `robot_description` ROS2 parameter
 package required.
 
 Usage:
@@ -483,7 +483,7 @@ class SamplingBasedJSPlanner(Node):
         np.random.seed(self.random_seed)
         random.seed(self.random_seed)
 
-        # ---- load robot config from URDF (no MoveIt) --------------------
+        # ---- load robot config from URDF --------------------
         urdf_str = p("robot_description").get_parameter_value().string_value
         if not urdf_str:
             raise RuntimeError("robot_description parameter is empty! Pass it via the launch file.")

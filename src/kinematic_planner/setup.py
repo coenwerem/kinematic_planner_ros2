@@ -13,8 +13,8 @@ setup(
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='Clinton Enwerem',
-    maintainer_email='robotdevx@gmail.com',
-    description='Standalone collision-free kinematic planner (RRT*, Informed RRT*). No MoveIt.',
+    maintainer_email='me@clintonenwerem.com',
+    description='Standalone collision-free kinematic planner (RRT*, Informed RRT*).',
     license='MIT',
     tests_require=['pytest'],
     entry_points={

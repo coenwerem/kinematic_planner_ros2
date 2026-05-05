@@ -3,7 +3,7 @@
 """
 RobotConfig: a pure-Python dataclass for robot metadata parsed entirely from a URDF string.
 
-No MoveIt, no ament_index, no SRDF required.  Joint limits, link names, and kinematic topology
+Joint limits, link names, and kinematic topology
 are extracted directly from the URDF XML using the standard library xml.etree module.
 
 Author: Clinton Enwerem

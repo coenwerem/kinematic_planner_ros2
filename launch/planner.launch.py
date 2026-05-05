@@ -8,7 +8,7 @@ Brings up the three nodes needed for collision-free RRT* planning:
   2. obstacle_publisher     — publishes scene obstacles
   3. planner_node           — runs RRT* and publishes the planned path
 
-No MoveIt required.  The robot is described entirely by the URDF xacro in
+The robot is described entirely by the URDF xacro in
 robot_3r_description.  Swap in a different URDF to use a different robot.
 
 Usage:
