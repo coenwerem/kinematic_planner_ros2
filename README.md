@@ -1,4 +1,4 @@
-# Kinematic Planner — Collision-Free Motion Planning in ROS 2
+# kinematic_planner_ros2
 
 A standalone ROS 2 workspace implementing **RRT\*** and **Informed RRT\*** path planning for
 robot manipulators, built without MoveIt.  Collision checking uses the
