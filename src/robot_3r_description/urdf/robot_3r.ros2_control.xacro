@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+<!-- Properties -->
+  <xacro:property name="default_initial_positions_file" value="$(find robot_3r_description)/config/initial_positions.yaml"/>
+
+  <xacro:macro name="threedofbot_fake_hardware" params=
+  "name:=threedofbot_fake_system
+  plugin:=gz_ros2_control/GazeboSimSystem
+  initial_positions_file:=${default_initial_positions_file}
+  ">
+
+    <xacro:property name="initial_positions" value="${xacro.load_yaml(initial_positions_file)['initial_positions']['robot_3r']}"/>
+
+  <ros2_control name="${name}" type="system">
+    <hardware>
+      <plugin>${plugin}</plugin>
+    </hardware>
+
+    <!-- Joints -->
+    <joint name="joint1">
+      <command_interface name="position"/>
+      <state_interface name="position">
+          <param name="initial_value">${initial_positions['joint1']}</param>
+        </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="joint2">
+      <command_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">${initial_positions['joint2']}</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="joint3">
+      <command_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">${initial_positions['joint3']}</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+</xacro:macro>
+
+</robot>

@@ -1,0 +1,25 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 500
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    threedofbot_joint_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+threedofbot_joint_trajectory_controller:
+  ros__parameters:
+    joints:
+      - joint1
+      - joint2
+      - joint3
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    gains:
+      joint1: { p: 50.0, d: 1.0 }
+      joint2: { p: 50.0, d: 1.0 }
+      joint3: { p: 50.0, d: 1.0 }

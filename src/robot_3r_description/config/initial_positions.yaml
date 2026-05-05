@@ -1,0 +1,5 @@
+initial_positions:
+  robot_3r: #ready
+    joint1: 1.004800
+    joint2: -0.690800
+    joint3: -1.067600
