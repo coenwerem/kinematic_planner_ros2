@@ -18,6 +18,8 @@
   <depend>rcl_interfaces</depend>
   <depend>robot_3r_interfaces</depend>
   <depend>robot_3r_description</depend>
+  <depend>trimesh</depend>
+  <depend>ament_index_python</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
