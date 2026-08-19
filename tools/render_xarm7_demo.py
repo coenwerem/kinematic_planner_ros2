@@ -45,7 +45,6 @@ from shape_msgs.msg import SolidPrimitive
 from geometry_msgs.msg import PoseStamped
 
 START = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-GOAL = [-0.698, -1.107, -1.0, 1.222, 0.356, -0.026, 0.373]
 MIN_OBS_DIST = 0.04
 RRTS_MAX_ITER = 2000
 RANDOM_SEED = 42
@@ -57,16 +56,32 @@ OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 TABLE_SIZE = (1.1, 1.1, 0.4)
 TABLE_POS = (0.0, 0.0, -0.2)
-OBSTACLES = [
-    {"pos": (0.35, 0.15, 0.3), "size": (0.08, 0.08, 0.6)},
-    {"pos": (0.35, -0.15, 0.3), "size": (0.08, 0.08, 0.6)},
-    {"pos": (0.50, 0.0, 0.25), "size": (0.08, 0.08, 0.5)},
-    {"pos": (0.20, 0.32, 0.3), "size": (0.08, 0.08, 0.6)},
-    {"pos": (0.20, -0.32, 0.3), "size": (0.08, 0.08, 0.6)},
-    {"pos": (0.50, 0.30, 0.275), "size": (0.08, 0.08, 0.55)},
-    {"pos": (0.50, -0.30, 0.275), "size": (0.08, 0.08, 0.55)},
-]
-ALL_STATIC_BOXES = [{"pos": TABLE_POS, "size": TABLE_SIZE}] + OBSTACLES
+
+# Two scenes, same table: "sparse" is 3 short obstacles (the easy case),
+# "tall" is fewer obstacles than an earlier 7-pillar attempt (found too
+# hard to read visually) but each one taller, so the arm has to duck
+# under/around rather than mostly clear over the top.
+SCENES = {
+    "sparse": {
+        "obstacles": [
+            {"pos": (0.35, 0.15, 0.2), "size": (0.08, 0.08, 0.4)},
+            {"pos": (0.35, -0.15, 0.2), "size": (0.08, 0.08, 0.4)},
+            {"pos": (0.50, 0.0, 0.15), "size": (0.08, 0.08, 0.3)},
+        ],
+        "goal": [0.2, -0.5, 0.0, 1.0, 0.0, 0.9, 0.0],
+        "out_name": "xarm7",
+    },
+    "tall": {
+        "obstacles": [
+            {"pos": (0.35, 0.15, 0.3), "size": (0.08, 0.08, 0.6)},
+            {"pos": (0.35, -0.15, 0.3), "size": (0.08, 0.08, 0.6)},
+            {"pos": (0.50, 0.0, 0.25), "size": (0.08, 0.08, 0.5)},
+            {"pos": (0.20, 0.32, 0.3), "size": (0.08, 0.08, 0.6)},
+        ],
+        "goal": [-0.698, -1.107, -1.0, 1.222, 0.356, -0.026, 0.373],
+        "out_name": "xarm7_tall",
+    },
+}
 
 
 def load_urdf_string() -> str:
@@ -74,10 +89,11 @@ def load_urdf_string() -> str:
     return open(urdf_path).read()
 
 
-def obstacle_scene() -> SceneObstacles:
+def obstacle_scene(obstacles) -> SceneObstacles:
+    all_boxes = [{"pos": TABLE_POS, "size": TABLE_SIZE}] + obstacles
     scene = SceneObstacles()
     boxes, poses, ids = [], [], []
-    for i, obs in enumerate(ALL_STATIC_BOXES):
+    for i, obs in enumerate(all_boxes):
         box = SolidPrimitive()
         box.type = SolidPrimitive.BOX
         box.dimensions = list(obs["size"])
@@ -93,7 +109,7 @@ def obstacle_scene() -> SceneObstacles:
     return scene
 
 
-def build_mujoco_model(urdf_str: str, workdir: str) -> mujoco.MjModel:
+def build_mujoco_model(urdf_str: str, workdir: str, obstacles) -> mujoco.MjModel:
     urdf_path = os.path.join(workdir, "xarm7.urdf")
     # mesh paths in the urdf (and, via meshdir, in the saved MJCF below) are
     # relative to its own directory
@@ -129,7 +145,7 @@ def build_mujoco_model(urdf_str: str, workdir: str) -> mujoco.MjModel:
         "type": "box", "size": " ".join(f"{s / 2:.4f}" for s in TABLE_SIZE),
         "pos": " ".join(str(p) for p in TABLE_POS), "rgba": "0.55 0.55 0.58 1", "group": "1",
     })
-    for obs in OBSTACLES:
+    for obs in obstacles:
         ET.SubElement(worldbody, "geom", {
             "type": "box", "size": " ".join(f"{s / 2:.4f}" for s in obs["size"]),
             "pos": " ".join(str(p) for p in obs["pos"]), "rgba": "0.88 0.53 0.16 1", "group": "1",
@@ -140,7 +156,7 @@ def build_mujoco_model(urdf_str: str, workdir: str) -> mujoco.MjModel:
     return mujoco.MjModel.from_xml_path(augmented_path)
 
 
-def verify_demo_claims(path, robot_config, collision_fn):
+def verify_demo_claims(path, goal, robot_config, collision_fn):
     """Print evidence for the claims this demo makes, instead of asserting
     them silently: that the naive straight-line interpolation between start
     and goal is genuinely invalid (so RRT* did real work), that every
@@ -157,7 +173,7 @@ def verify_demo_claims(path, robot_config, collision_fn):
     print(f"Every returned waypoint collision-free: {all_waypoints_free}")
 
     print(f"Start matches requested start: {np.allclose(path[0], START)}")
-    print(f"Goal matches requested goal: {np.allclose(path[-1], GOAL)}")
+    print(f"Goal matches requested goal: {np.allclose(path[-1], goal)}")
 
 
 def _single_config_node(q):
@@ -167,13 +183,13 @@ def _single_config_node(q):
     return node
 
 
-def find_goal_with_solution(robot_config, collision_fn, rng_seed):
-    """START is fixed; GOAL is a hand-picked reachable, collision-free
+def find_goal_with_solution(robot_config, collision_fn, goal, rng_seed):
+    """START is fixed; goal is a hand-picked reachable, collision-free
     configuration on the far side of the obstacle cluster from START,
     verified below to have an RRT* solution."""
     rng = np.random.default_rng(rng_seed)
     planner = RRTStar(
-        start=START, goal=GOAL, joint_limits=robot_config.joint_limits,
+        start=START, goal=goal, joint_limits=robot_config.joint_limits,
         expand_dist=0.3, path_resolution=0.1, max_iter=RRTS_MAX_ITER,
         connect_circle_dist=25, goal_sample_rate=0.2, collision_fn=collision_fn,
         use_goal_biased_sampling=True, goal_noise_sigma=0.4, rng=rng,
@@ -183,10 +199,14 @@ def find_goal_with_solution(robot_config, collision_fn, rng_seed):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--scene", choices=sorted(SCENES), default="sparse")
     parser.add_argument("--out-dir", default=OUT_DIR)
-    parser.add_argument("--out-name", default="xarm7")
+    parser.add_argument("--out-name", default=None)
     args = parser.parse_args()
-    out_dir, out_name = args.out_dir, args.out_name
+    scene = SCENES[args.scene]
+    obstacles, goal = scene["obstacles"], scene["goal"]
+    out_dir = args.out_dir
+    out_name = args.out_name or scene["out_name"]
     os.makedirs(out_dir, exist_ok=True)
 
     urdf_str = load_urdf_string()
@@ -201,17 +221,17 @@ def main():
     os.remove(rtb_path)
 
     collision_fn = build_collision_fn(
-        robot_config=robot_config, link_shapes=link_shapes, obstacle_geom=obstacle_scene(),
+        robot_config=robot_config, link_shapes=link_shapes, obstacle_geom=obstacle_scene(obstacles),
         rtb_model=rtb_model, collision_checker="proximity", min_obs_dist=MIN_OBS_DIST,
         check_collision=True,
     )
 
-    planner, path = find_goal_with_solution(robot_config, collision_fn, RANDOM_SEED)
+    planner, path = find_goal_with_solution(robot_config, collision_fn, goal, RANDOM_SEED)
     if path is None:
         print("No path found -- aborting render.", file=sys.stderr)
         sys.exit(1)
     print(f"Path found: {len(path)} waypoints, cost {planner.compute_path_cost(path):.3f} rad")
-    verify_demo_claims(path, robot_config, collision_fn)
+    verify_demo_claims(path, goal, robot_config, collision_fn)
 
     frames_q = interpolate_waypoints([np.array(q) for q in path], STEPS_PER_SEGMENT)
     frames_q = [frames_q[0]] * (START_HOLD_FRAMES - 1) + frames_q
@@ -219,7 +239,7 @@ def main():
 
     import tempfile
     with tempfile.TemporaryDirectory() as workdir:
-        model = build_mujoco_model(urdf_str, workdir)
+        model = build_mujoco_model(urdf_str, workdir, obstacles)
     data = mujoco.MjData(model)
     renderer = mujoco.Renderer(model, height=720, width=960)
     cam = mujoco.MjvCamera()
