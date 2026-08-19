@@ -57,7 +57,7 @@ def _parse_origin(origin_el) -> sm.SE3:
         return sm.SE3()
     xyz = [float(x) for x in origin_el.get("xyz", "0 0 0").split()]
     rpy = [float(x) for x in origin_el.get("rpy", "0 0 0").split()]
-    return sm.SE3(xyz) * sm.SE3.RPY(rpy, order="xyz", unit="rad")
+    return sm.SE3(xyz) * sm.SE3.RPY(rpy, order="zyx", unit="rad")
 
 
 def build_link_collision_shapes(urdf_root: ET.Element) -> Dict[str, List[CollisionShape]]:

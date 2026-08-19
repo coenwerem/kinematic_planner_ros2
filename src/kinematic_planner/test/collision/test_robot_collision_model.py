@@ -114,3 +114,23 @@ def test_link_shapes_to_fcl_objects_composes_link_and_local_transforms():
     objs = link_shapes_to_fcl_objects([shape], link_world_transform)
     world_translation = objs[0].getTranslation()
     assert np.allclose(world_translation, [1.0, 2.0, 0.0])
+
+
+def test_collision_origin_rpy_uses_urdf_yaw_pitch_roll_convention():
+    urdf = """
+    <robot name="test_robot">
+      <link name="link_rpy">
+        <collision>
+          <origin xyz="0 0 0" rpy="0 0 1.5707963267948966"/>
+          <geometry><box size="0.1 0.1 0.1"/></geometry>
+        </collision>
+      </link>
+    </robot>
+    """
+    root = ET.fromstring(urdf)
+    shapes_by_link = build_link_collision_shapes(root)
+    shapes = shapes_by_link["link_rpy"]
+    assert len(shapes) == 1
+    rotation = shapes[0].local_origin[:3, :3]
+    expected_rotation = np.array([[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]])
+    assert np.allclose(rotation, expected_rotation, atol=1e-6)
