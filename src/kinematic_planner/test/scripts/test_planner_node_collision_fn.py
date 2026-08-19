@@ -75,3 +75,35 @@ def test_collision_fn_returns_false_and_logs_on_per_link_exception():
     node.path_q = [node.q]
     assert fn(node) is False
     assert logger.errors
+
+
+class _MalformedObstacleGeom:
+    """Stands in for an obstacle_geom whose obstacle_ids/scene_obstacles
+    are inconsistent, e.g. shorter than obstacle_ids, so
+    obstacle_to_fclobj() raises (an IndexError here) while iterating."""
+
+    obstacle_ids = ["obs_0"]
+    obstacle_poses = []
+    scene_obstacles = []
+
+
+def test_collision_fn_returns_false_and_logs_when_obstacle_conversion_raises():
+    """Finding 5: obstacle_to_fclobj(obstacle_geom) must not be able to
+    raise out of collision_fn uncaught -- a malformed /scene_obstacles
+    message must fail safe (treated as a collision) rather than crash
+    the /joint_states callback."""
+    logger = _LoggerSpy()
+    fn = build_collision_fn(
+        robot_config=_FakeRobotConfig(),
+        robot_geom=_FakeRobotGeom(),
+        obstacle_geom=_MalformedObstacleGeom(),
+        rtb_model=_RaisingRTBModel(),  # never reached; obstacle conversion fails first
+        collision_checker="proximity",
+        min_obs_dist=0.1,
+        check_collision=True,
+        get_logger=lambda: logger,
+    )
+    node = TreeNode(np.array([0.0, 0.0, 0.0]))
+    node.path_q = [node.q]
+    assert fn(node) is False
+    assert logger.errors

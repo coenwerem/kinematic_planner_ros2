@@ -63,11 +63,27 @@ def _build_rtb_model(urdf_path: str):
 
 
 class _NullClockNode:
-    """Supplies get_clock() for se3_to_pose_stamped() outside an rclpy.Node."""
+    """Supplies get_clock() for se3_to_pose_stamped() outside an rclpy.Node.
+
+    se3_to_pose_stamped() only reads the returned clock to stamp a
+    PoseStamped header, and create_fcl_object() (the only downstream
+    consumer of that PoseStamped in build_collision_fn) reads only
+    pose.pose.position/orientation, never the header/stamp. A single
+    cached Clock is therefore safe to share across every call.
+    """
+
+    def __init__(self):
+        from rclpy.clock import Clock
+        self._clock = Clock()
 
     def get_clock(self):
-        from rclpy.clock import Clock
-        return Clock()
+        return self._clock
+
+
+# Single module-level instance reused by build_collision_fn's collision_fn
+# closure so the per-link, per-waypoint hot loop does not allocate a new
+# _NullClockNode/Clock on every call.
+_NULL_CLOCK_NODE = _NullClockNode()
 
 
 def build_collision_fn(robot_config, robot_geom, obstacle_geom, rtb_model,
@@ -84,7 +100,17 @@ def build_collision_fn(robot_config, robot_geom, obstacle_geom, rtb_model,
         return lambda _node: True
 
     def collision_fn(candidate_node: TreeNode) -> bool:
-        obs_fcl_objects = list(obstacle_to_fclobj(obstacles=obstacle_geom))
+        try:
+            obs_fcl_objects = list(obstacle_to_fclobj(obstacles=obstacle_geom))
+        except Exception as e:
+            # fail-safe, matching the per-link except below: a malformed
+            # obstacle_geom message must not propagate out of collision_fn
+            # and crash the /joint_states callback, so treat candidate_node
+            # as in collision.
+            logger = get_logger()
+            if logger is not None:
+                logger.error(f"Error converting obstacle geometry: {e}")
+            return False
         for q in candidate_node.path_q:
             rtb_model.q = q
             for link in rtb_model.links:
@@ -107,7 +133,7 @@ def build_collision_fn(robot_config, robot_geom, obstacle_geom, rtb_model,
                     else:
                         continue
                     rob_pose = se3_to_pose_stamped(
-                        T_fk_se3, _NullClockNode(), frame_id=robot_config.base_link_name,
+                        T_fk_se3, _NULL_CLOCK_NODE, frame_id=robot_config.base_link_name,
                     )
                     rob_obj = create_fcl_object(rob_pose, geom)
                     for obs_obj in obs_fcl_objects:
@@ -215,6 +241,11 @@ class SamplingBasedJSPlanner(Node):
         self.random_seed = p("random_seed").get_parameter_value().integer_value
         np.random.seed(self.random_seed)
         random.seed(self.random_seed)
+        # Constructed once and reused across every compute_plan() call so
+        # successive planning attempts (triggered by repeated /joint_states
+        # callbacks) keep advancing the same stream instead of replaying an
+        # identical sample sequence each time.
+        self.rng = np.random.default_rng(self.random_seed)
 
         # ---- load robot config from URDF --------------------
         urdf_str = p("robot_description").get_parameter_value().string_value
@@ -331,7 +362,7 @@ class SamplingBasedJSPlanner(Node):
             use_goal_biased_sampling=self.use_goal_biased_sampling,
             goal_noise_sigma=self.goal_noise_sigma,
             search_until_max_iter=self.rrts_search_until_max_iter,
-            rng=np.random.default_rng(self.random_seed),
+            rng=self.rng,
         )
 
         self.planning_attempts += 1

@@ -125,6 +125,11 @@ class InformedRRTStarPlanner(Node):
         self.random_seed = p("random_seed").get_parameter_value().integer_value
         np.random.seed(self.random_seed)
         random.seed(self.random_seed)
+        # Constructed once and reused across every compute_plan() call so
+        # successive planning attempts (triggered by repeated /joint_states
+        # callbacks) keep advancing the same stream instead of replaying an
+        # identical sample sequence each time.
+        self.rng = np.random.default_rng(self.random_seed)
 
         # ---- load robot config from URDF --------------------------------
         urdf_str = p("robot_description").get_parameter_value().string_value
@@ -219,7 +224,7 @@ class InformedRRTStarPlanner(Node):
             connect_circle_dist=self.rrts_connect_circle_dist,
             collision_fn=collision_fn,
             search_until_max_iter=self.rrts_search_until_max_iter,
-            rng=np.random.default_rng(self.random_seed),
+            rng=self.rng,
         )
 
         self.planning_attempts += 1
