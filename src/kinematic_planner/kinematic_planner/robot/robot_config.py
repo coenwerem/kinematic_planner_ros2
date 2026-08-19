@@ -52,9 +52,11 @@ class RobotConfig:
 
         Args:
             urdf_str: Raw URDF XML as a string (e.g. from the robot_description parameter).
-            disabled_pairs: Link pairs to skip during self-collision checks.
-                            Pass the adjacency pairs from your SRDF here, or leave None
-                            to check all link pairs (expensive but correct as a default).
+            disabled_pairs: Additional link pairs to skip during self-collision checks,
+                            beyond the joint-adjacent pairs automatically excluded. Joint-adjacent
+                            pairs (those connected by a joint in the URDF) are always auto-excluded
+                            regardless of disabled_pairs. Passing None does not disable the adjacency
+                            auto-exclusion; it only skips additional manual exclusions.
             world_frame: Name of the world / fixed frame used in transforms.
             actuated_joint_types: Joint types treated as degrees of freedom.
 
