@@ -23,8 +23,8 @@ import itertools
 
 
 class ObstaclePublisher(Node):
-    def __init__(self):
-        super().__init__("obstacle_publisher")
+    def __init__(self, **kwargs):
+        super().__init__("obstacle_publisher", **kwargs)
 
         # ---- robot-frame parameters ------
         self.declare_parameter("base_link_name", "base_link")
@@ -88,11 +88,13 @@ class ObstaclePublisher(Node):
     def timer_callback(self):
         self.publish_obstacles()
 
-    def publish_obstacles(self):
+    def build_obstacles_message(self) -> SceneObstacles:
         msg = SceneObstacles()
         poses = []
         obstacles = []
         obstacle_ids = []
+
+        stride = {"box": 3, "sphere": 1, "cylinder": 2}[self.obstacle_type]
 
         for i in range(self.num_obstacles):
             pose = PoseStamped()
@@ -104,22 +106,32 @@ class ObstaclePublisher(Node):
             poses.append(pose)
             obstacle_ids.append(i + 1)
 
+            dims = self.obstacle_sizes[stride * i:stride * i + stride] if self.is_dense else self.obstacle_sizes[:stride]
+
+            obstacle = SolidPrimitive()
             if self.obstacle_type == "box":
-                obstacle = SolidPrimitive()
                 obstacle.type = SolidPrimitive.BOX
-                obstacle.dimensions = (
-                    self.obstacle_sizes[3 * i:3 * i + 3] if self.is_dense else self.obstacle_sizes
-                )
-                obstacles.append(obstacle)
+            elif self.obstacle_type == "sphere":
+                obstacle.type = SolidPrimitive.SPHERE
+            elif self.obstacle_type == "cylinder":
+                obstacle.type = SolidPrimitive.CYLINDER
+            else:
+                self.get_logger().error(f"Unsupported obstacle_type: {self.obstacle_type}")
+                continue
+            obstacle.dimensions = list(dims)
+            obstacles.append(obstacle)
             self.obstacle_dict[i + 1] = (obstacle, pose)
 
         msg.scene_obstacles = obstacles
         msg.obstacle_poses = poses
         msg.obstacle_ids = obstacle_ids
-        self.scene_obstacle_publisher_.publish(msg)
+        return msg
 
+    def publish_obstacles(self):
+        msg = self.build_obstacles_message()
+        self.scene_obstacle_publisher_.publish(msg)
         if self.first_publish:
-            self.get_logger().info(f"Published {len(obstacles)} obstacles.")
+            self.get_logger().info(f"Published {len(msg.scene_obstacles)} obstacles.")
             self.first_publish = False
 
     def publish_obstacle_markers(self):
