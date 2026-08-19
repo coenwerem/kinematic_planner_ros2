@@ -55,7 +55,7 @@ START_HOLD_FRAMES = 20
 HOLD_FRAMES = 40
 OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "media")
 
-TABLE_SIZE = (0.6, 0.6, 0.4)
+TABLE_SIZE = (1.1, 1.1, 0.4)
 TABLE_POS = (0.0, 0.0, -0.2)
 OBSTACLES = [
     {"pos": (0.35, 0.15, 0.2), "size": (0.08, 0.08, 0.4)},
