@@ -126,6 +126,11 @@ def build_collision_fn(robot_config, link_shapes, obstacle_geom, rtb_model,
                 return False
 
             for link_name, robot_objs in link_fcl_objects.items():
+                if link_name == robot_config.base_link_name:
+                    # The base link's pose is fixed relative to obstacles regardless
+                    # of joint configuration, so a proximity violation here can never
+                    # be resolved by planning; only self-collision applies to it.
+                    continue
                 for rob_obj in robot_objs:
                     for obs_obj in obs_fcl_objects:
                         try:
@@ -185,7 +190,7 @@ class SamplingBasedJSPlanner(Node):
         self.declare_parameter("verbose", False)
         self.declare_parameter("rrts_expand_dist", 0.3)
         self.declare_parameter("rrts_path_resolution", 0.1)
-        self.declare_parameter("rrts_max_iter", 300)
+        self.declare_parameter("rrts_max_iter", 2000)
         self.declare_parameter("rrts_connect_circle_dist", 20)
         self.declare_parameter("rrts_search_until_max_iter", False)
         self.declare_parameter("rrts_goal_sample_rate", 0.3)
@@ -205,6 +210,7 @@ class SamplingBasedJSPlanner(Node):
         # disabled_collision_pairs: list of "link_a:link_b" strings
         self.declare_parameter("disabled_collision_pairs", [""])
         self.declare_parameter("world_frame", "world")
+        self.declare_parameter("base_link_name", "base_link")
         # robot_description loaded from URDF (set by launch file or robot_state_publisher)
         if not self.has_parameter("robot_description"):
             self.declare_parameter("robot_description", "")
@@ -253,8 +259,10 @@ class SamplingBasedJSPlanner(Node):
                 disabled_pairs.append((a.strip(), b.strip()))
 
         world_frame = p("world_frame").get_parameter_value().string_value
+        base_link_name = p("base_link_name").get_parameter_value().string_value or None
         self.robot_config = RobotConfig.from_urdf(urdf_str, disabled_pairs=disabled_pairs,
-                                                   world_frame=world_frame)
+                                                   world_frame=world_frame,
+                                                   base_link_name=base_link_name)
         self.link_shapes = build_link_collision_shapes(ET.fromstring(urdf_str))
         self.joint_limits = self.robot_config.joint_limits
 

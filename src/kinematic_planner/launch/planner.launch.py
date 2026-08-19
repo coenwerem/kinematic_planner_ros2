@@ -3,10 +3,12 @@
 """
 Launch file for the standalone kinematic planner.
 
-Brings up the three nodes needed for collision-free RRT* planning:
-  1. robot_geom_publisher  — publishes robot link geometry from URDF
-  2. obstacle_publisher     — publishes scene obstacles
-  3. planner_node           — runs RRT* and publishes the planned path
+Brings up the nodes needed for collision-free RRT* planning:
+  1. robot_state_publisher — publishes /robot_description and TF from URDF
+  2. robot_geom_publisher  — publishes robot link geometry from URDF
+  3. obstacle_publisher     — publishes scene obstacles
+  4. joint_state_publisher — publishes the robot's start joint configuration
+  5. planner_node           — runs RRT* and publishes the planned path
 
 The robot is described entirely by the URDF xacro in
 robot_3r_description.  Swap in a different URDF to use a different robot.
@@ -57,7 +59,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "rrts_max_iter",
-            default_value="300",
+            default_value="2000",
             description="Maximum RRT* iterations.",
         ),
         DeclareLaunchArgument(
@@ -95,6 +97,14 @@ def generate_launch_description():
         ),
     ]
 
+    robot_state_publisher = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        name="robot_state_publisher",
+        parameters=[{"robot_description": robot_description}],
+        output="screen",
+    )
+
     robot_geom_publisher = Node(
         package="kinematic_planner",
         executable="robot_geom_publisher",
@@ -121,6 +131,14 @@ def generate_launch_description():
         output="screen",
     )
 
+    joint_state_publisher = Node(
+        package="joint_state_publisher",
+        executable="joint_state_publisher",
+        name="joint_state_publisher",
+        parameters=[{"robot_description": robot_description}],
+        output="screen",
+    )
+
     planner_node = Node(
         package="kinematic_planner",
         executable="planner_node",
@@ -133,6 +151,7 @@ def generate_launch_description():
             "rrts_max_iter": LaunchConfiguration("rrts_max_iter"),
             "verbose": LaunchConfiguration("verbose"),
             "world_frame": LaunchConfiguration("world_frame"),
+            "base_link_name": LaunchConfiguration("base_link_name"),
         }],
         output="screen",
         condition=LaunchConfigurationEquals("algorithm", "rrt_star"),
@@ -150,14 +169,17 @@ def generate_launch_description():
             "rrts_max_iter": LaunchConfiguration("rrts_max_iter"),
             "verbose": LaunchConfiguration("verbose"),
             "world_frame": LaunchConfiguration("world_frame"),
+            "base_link_name": LaunchConfiguration("base_link_name"),
         }],
         output="screen",
         condition=LaunchConfigurationEquals("algorithm", "informed_rrt_star"),
     )
 
     return LaunchDescription(declared_args + [
+        robot_state_publisher,
         robot_geom_publisher,
         obstacle_publisher,
+        joint_state_publisher,
         planner_node,
         informed_rrt_star_node,
     ])

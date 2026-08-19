@@ -77,11 +77,11 @@ class InformedRRTStarPlanner(Node):
         )
 
         self.declare_parameter("planning_algorithm", "rrt_star")
-        self.declare_parameter("stop_if_plan_found", False)
+        self.declare_parameter("stop_if_plan_found", True)
         self.declare_parameter("verbose", False)
         self.declare_parameter("rrts_expand_dist", 0.3)
         self.declare_parameter("rrts_path_resolution", 0.1)
-        self.declare_parameter("rrts_max_iter", 300)
+        self.declare_parameter("rrts_max_iter", 2000)
         self.declare_parameter("rrts_connect_circle_dist", 20)
         self.declare_parameter("rrts_search_until_max_iter", True)
         self.declare_parameter("rrts_goal_sample_rate", 0.3)
@@ -100,6 +100,7 @@ class InformedRRTStarPlanner(Node):
         self.declare_parameter("start_goal_collision", "")
         self.declare_parameter("disabled_collision_pairs", [""])
         self.declare_parameter("world_frame", "world")
+        self.declare_parameter("base_link_name", "base_link")
         if not self.has_parameter("robot_description"):
             self.declare_parameter("robot_description", "")
 
@@ -144,8 +145,10 @@ class InformedRRTStarPlanner(Node):
             tuple(s.split(":", 1)) for s in raw_disabled if ":" in s
         ]
         world_frame = p("world_frame").get_parameter_value().string_value
+        base_link_name = p("base_link_name").get_parameter_value().string_value or None
         self.robot_config = RobotConfig.from_urdf(urdf_str, disabled_pairs=disabled_pairs,
-                                                   world_frame=world_frame)
+                                                   world_frame=world_frame,
+                                                   base_link_name=base_link_name)
         self.link_shapes = build_link_collision_shapes(ET.fromstring(urdf_str))
         self.joint_limits = self.robot_config.joint_limits
 

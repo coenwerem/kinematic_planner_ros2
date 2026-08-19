@@ -45,6 +45,7 @@ class RobotConfig:
         urdf_str: str,
         disabled_pairs: List[Tuple[str, str]] = None,
         world_frame: str = "world",
+        base_link_name: str = None,
         actuated_joint_types: Tuple[str, ...] = ("revolute", "prismatic", "continuous"),
     ) -> "RobotConfig":
         """
@@ -58,6 +59,16 @@ class RobotConfig:
                             regardless of disabled_pairs. Passing None does not disable the adjacency
                             auto-exclusion; it only skips additional manual exclusions.
             world_frame: Name of the world / fixed frame used in transforms.
+            base_link_name: Name of the robot's own mounting link, used by collision
+                            checking to exclude the static base from robot-vs-obstacle
+                            checks (its pose never changes with the joint configuration,
+                            so a false positive there can never be resolved by planning).
+                            Pass the link name explicitly whenever the URDF declares a
+                            separate fixed root link (e.g. "world") above the robot's
+                            own base, since the no-parent-joint heuristic below then
+                            resolves to that root link, not the robot's base. Leave
+                            None to auto-derive the link with no parent joint, correct
+                            only when the robot's base link is itself the URDF root.
             actuated_joint_types: Joint types treated as degrees of freedom.
 
         Returns:
@@ -101,10 +112,13 @@ class RobotConfig:
         # --- link data ----------------------------------------------------------
         all_link_names = [lnk.get("name", "") for lnk in root.findall("link")]
 
-        # base link = has no parent joint
-        base_link_name = next(
-            (ln for ln in all_link_names if ln not in child_links), ""
-        )
+        # base link = has no parent joint, unless the caller names it explicitly
+        # (needed whenever the URDF has a separate fixed root link above the
+        # robot's own base, e.g. "world")
+        if base_link_name is None:
+            base_link_name = next(
+                (ln for ln in all_link_names if ln not in child_links), ""
+            )
 
         # ee link = has no child joint (last in chain)
         ee_link_name = next(

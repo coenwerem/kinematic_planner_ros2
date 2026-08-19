@@ -29,7 +29,9 @@ kinematic_planner_ros2/
 └── src/
     ├── kinematic_planner/           # main package — planner, collision, robot model
     │   ├── launch/
-    │   │   └── planner.launch.py    # single entry point; connects all three nodes
+    │   │   └── planner.launch.py    # single entry point; brings up robot_state_publisher,
+    │   │                             # joint_state_publisher, robot_geom_publisher,
+    │   │                             # obstacle_publisher, and the selected planner node
     │   └── kinematic_planner/
     │       ├── robot/
     │       │   ├── robot_config.py  # RobotConfig dataclass; from_urdf() classmethod
@@ -57,6 +59,11 @@ kinematic_planner_ros2/
   ```bash
   sudo apt install ros-humble-xacro
   ```
+- **robot_state_publisher** and **joint_state_publisher** — the launch file
+  runs both nodes to publish `/robot_description` and a start `/joint_states`:
+  ```bash
+  sudo apt install ros-humble-robot-state-publisher ros-humble-joint-state-publisher
+  ```
 
 ### Python packages
 
@@ -64,12 +71,19 @@ Install into your ROS 2 Python environment:
 
 ```bash
 pip install \
-  roboticstoolbox-python \
+  "roboticstoolbox-python>=1.3.1" \
+  "spatialgeometry>=1.3.0" \
   spatialmath-python \
   transforms3d \
   trimesh \
-  numpy
+  "numpy>=2.0"
 ```
+
+> **Note on `numpy` 2.x:** `roboticstoolbox-python` releases before 1.2 and
+> `spatialgeometry` releases before 1.3.0 ship compiled extensions built
+> against the NumPy 1.x ABI and fail to import under NumPy 2.x
+> (`ImportError: numpy.core.multiarray failed to import`). The versions
+> pinned above are the first to publish NumPy 2-compatible wheels.
 
 Install the FCL Python bindings:
 
@@ -117,10 +131,11 @@ Plan to a specific goal configuration:
 ros2 launch kinematic_planner planner.launch.py goal_config:="[1.5093, 0.6072, 1.4052]"
 ```
 
-Enable the dense obstacle ring (10 obstacles arranged in a circle around the robot):
+Enable the dense obstacle ring (10 obstacles arranged in a circle around the robot).
+The default `goal_config` sits inside the obstacle ring, so pass a goal outside the ring:
 
 ```bash
-ros2 launch kinematic_planner planner.launch.py is_dense:=true
+ros2 launch kinematic_planner planner.launch.py is_dense:=true goal_config:="[0.8, -0.5, 0.5]"
 ```
 
 ### Informed RRT\* planner

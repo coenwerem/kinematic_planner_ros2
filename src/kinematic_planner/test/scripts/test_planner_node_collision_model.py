@@ -82,6 +82,90 @@ def test_check_collision_false_accepts_every_candidate():
     assert fn(node) is True
 
 
+BASE_AND_ARM_URDF = """
+<robot name="base_link_exclusion_test_robot">
+  <link name="base_link">
+    <collision><geometry><box size="0.2 0.2 0.2"/></geometry></collision>
+  </link>
+  <link name="link_1">
+    <collision><geometry><box size="0.2 0.2 0.2"/></geometry></collision>
+  </link>
+  <joint name="joint_1" type="revolute">
+    <parent link="base_link"/><child link="link_1"/>
+    <axis xyz="0 0 1"/><limit lower="-3.14" upper="3.14"/>
+  </joint>
+</robot>
+"""
+
+
+class _FixedPoseRTBModel:
+    """base_link stays at the origin; link_1 sits far away at (5, 5, 5),
+    so an obstacle placed at the origin overlaps only base_link."""
+
+    links = [_FakeLink("base_link"), _FakeLink("link_1")]
+
+    def __init__(self):
+        self.q = None
+
+    def fkine(self, q, end, include_base=True):
+        class _SE3:
+            def __init__(self, A):
+                self.A = A
+        if end == "base_link":
+            return _SE3(np.eye(4))
+        offset = np.eye(4)
+        offset[:3, 3] = [5.0, 5.0, 5.0]
+        return _SE3(offset)
+
+
+def _obstacle_scene_at(position, size=(0.2, 0.2, 0.2)):
+    scene = SceneObstacles()
+    box = SolidPrimitive()
+    box.type = SolidPrimitive.BOX
+    box.dimensions = list(size)
+    pose = PoseStamped()
+    pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = position
+    pose.pose.orientation.w = 1.0
+    scene.scene_obstacles = [box]
+    scene.obstacle_poses = [pose]
+    scene.obstacle_ids = [0]
+    return scene
+
+
+def test_base_link_excluded_from_obstacle_check_but_arm_link_still_checked():
+    robot_config = RobotConfig.from_urdf(BASE_AND_ARM_URDF, base_link_name="base_link")
+    link_shapes = build_link_collision_shapes(ET.fromstring(BASE_AND_ARM_URDF))
+
+    # An obstacle overlapping only base_link (link_1 sits far away) must be
+    # ignored: the base link's pose never changes with the joint
+    # configuration, so a violation there can never be resolved by planning.
+    fn = build_collision_fn(
+        robot_config=robot_config,
+        link_shapes=link_shapes,
+        obstacle_geom=_obstacle_scene_at((0.0, 0.0, 0.0)),
+        rtb_model=_FixedPoseRTBModel(),
+        collision_checker="bvol",
+        min_obs_dist=0.0,
+        check_collision=True,
+    )
+    node = TreeNode(np.array([0.0]))
+    node.path_q = [node.q]
+    assert fn(node) is True
+
+    # Moving the same obstacle to link_1's actual location proves the
+    # exclusion is base_link-specific, not a blanket ignore of obstacles.
+    fn_arm_blocked = build_collision_fn(
+        robot_config=robot_config,
+        link_shapes=link_shapes,
+        obstacle_geom=_obstacle_scene_at((5.0, 5.0, 5.0)),
+        rtb_model=_FixedPoseRTBModel(),
+        collision_checker="bvol",
+        min_obs_dist=0.0,
+        check_collision=True,
+    )
+    assert fn_arm_blocked(node) is False
+
+
 def test_self_collision_between_non_adjacent_overlapping_links_is_detected():
     robot_config = RobotConfig.from_urdf(TWO_LINK_SELF_COLLIDING_URDF)
     # joint_2 is a fixed joint (no actuated DOF between link_1/link_2), and a
