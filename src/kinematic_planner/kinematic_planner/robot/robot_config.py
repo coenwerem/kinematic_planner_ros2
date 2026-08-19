@@ -64,8 +64,9 @@ class RobotConfig:
         root = ET.fromstring(urdf_str)
 
         # --- joint data ---------------------------------------------------------
-        child_links = set()   # links that appear as a joint child (have a parent)
-        parent_links = set()  # links that appear as a joint parent
+        child_links = set()   # links serving as a joint's child, each with a parent
+        parent_links = set()  # links serving as a joint's parent
+        adjacent_link_pairs: List[Tuple[str, str]] = []
 
         joint_names: List[str] = []
         joint_limits: List[Tuple[float, float]] = []
@@ -78,6 +79,8 @@ class RobotConfig:
                 parent_links.add(parent_el.get("link", ""))
             if child_el is not None:
                 child_links.add(child_el.get("link", ""))
+            if parent_el is not None and child_el is not None:
+                adjacent_link_pairs.append((parent_el.get("link", ""), child_el.get("link", "")))
 
             if jtype not in actuated_joint_types:
                 continue
@@ -112,6 +115,8 @@ class RobotConfig:
             if lnk.find("collision") is not None:
                 collision_links.append(lnk.get("name", ""))
 
+        merged_disabled_pairs = list(disabled_pairs or []) + adjacent_link_pairs
+
         return cls(
             joint_names=joint_names,
             joint_limits=joint_limits,
@@ -119,5 +124,5 @@ class RobotConfig:
             base_link_name=base_link_name,
             ee_link_name=ee_link_name,
             world_frame=world_frame,
-            disabled_collision_pairs=disabled_pairs or [],
+            disabled_collision_pairs=merged_disabled_pairs,
         )
