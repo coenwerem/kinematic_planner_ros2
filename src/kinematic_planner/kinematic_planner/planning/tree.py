@@ -105,22 +105,17 @@ class RRTPlannerBase:
                 return cand
             return None
 
-        costs = []
+        candidates = []
         for i in near_inds:
             near_node = self.config_tree[i]
             cand = self.steer(near_node, new_node)
             if cand is not None and self.collision_fn(cand):
-                costs.append(calc_new_cost(near_node, cand))
+                candidates.append((calc_new_cost(near_node, cand), cand))
             else:
-                costs.append(float("inf"))
+                candidates.append((float("inf"), None))
 
-        min_cost = min(costs)
+        min_cost, best_cand = min(candidates, key=lambda x: x[0])
         if min_cost == float("inf"):
             return None
-        min_ind = near_inds[costs.index(min_cost)]
-        steered = self.steer(self.config_tree[min_ind], new_node)
-        if steered is None:
-            return None
-        steered.parent = self.config_tree[min_ind]
-        steered.cost = min_cost
-        return steered
+        best_cand.cost = min_cost
+        return best_cand
