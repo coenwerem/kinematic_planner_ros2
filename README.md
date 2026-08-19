@@ -56,7 +56,7 @@ citing the related paper below:
 
 ---
 
-## xArm7 example (7-DOF)
+## xArm7 Example (7-DOF)
 
 The hero GIF at the top runs the exact same planning stack (`RobotConfig`,
 `build_collision_fn`, `RRTStar`) against `xarm7_description`'s 7-DOF xArm7
@@ -147,7 +147,7 @@ tools/
   sudo apt install ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher
   ```
 
-### Python packages
+### Python Packages
 
 Install into your ROS 2 Python environment:
 
@@ -205,7 +205,7 @@ source install/setup.bash
 
 ---
 
-## Run: the 3R reference example
+## Run: The 3R Reference Example
 
 The 3R reference example below is the smaller 3-DOF arm bundled with the
 repo as a quick, dependency-light demo. For the 7-DOF xArm7 MuJoCo demo
@@ -219,7 +219,7 @@ ros2 launch kinematic_planner planner.launch.py &
 rviz2 -d src/robot_3r_description/rviz/view_3r_demo.rviz
 ```
 
-### RRT\* planner (default)
+### RRT\* Planner (Default)
 
 ```bash
 ros2 launch kinematic_planner planner.launch.py
@@ -238,7 +238,7 @@ the default `goal_config` is collision-free against both scenes:
 ros2 launch kinematic_planner planner.launch.py is_dense:=true
 ```
 
-### Informed RRT\* planner
+### Informed RRT\* Planner
 
 Informed RRT\* runs the same RRT\* algorithm until a first solution is found, then
 focuses all subsequent sampling inside the smallest ellipsoid in C-space that can contain
@@ -248,7 +248,7 @@ any path of equal or lower cost — converging to the optimum faster than plain 
 ros2 launch kinematic_planner planner.launch.py algorithm:=informed_rrt_star
 ```
 
-### Verify a path was found
+### Verify a Path Was Found
 
 ```bash
 ros2 topic echo /smpb_planner/jsp_path --once
@@ -257,7 +257,7 @@ ros2 topic echo /smpb_planner/jsp_path --once
 You should see a `JointSpacePath` message with waypoints from the start configuration
 to the goal.
 
-### Reproducing the demo recordings
+### Reproducing the Demo Recordings
 
 ```bash
 # 3R matplotlib demo
@@ -272,7 +272,7 @@ python3 tools/render_xarm7_demo.py --scene tall
 
 ---
 
-## Launch arguments
+## Launch Arguments
 
 | Argument | Default | Description |
 |---|---|---|
@@ -290,7 +290,7 @@ python3 tools/render_xarm7_demo.py --scene tall
 
 ---
 
-## Planner node parameters
+## Planner Node Parameters
 
 All parameters can be overridden at runtime with `--ros-args -p <name>:=<value>`.
 
@@ -313,7 +313,7 @@ All parameters can be overridden at runtime with `--ros-args -p <name>:=<value>`
 
 ---
 
-## Using a different robot
+## Using a Different Robot
 
 1. Add your URDF or xacro to the workspace (or point to an existing package).
 2. Edit `src/kinematic_planner/launch/planner.launch.py` — change `urdf_file` to your robot's xacro path.
@@ -335,7 +335,7 @@ in its URDF `<collision>` elements.  Mesh-based collision geometry is not suppor
 
 ---
 
-## Algorithm references
+## Algorithm References
 
 - **RRT\***: Karaman & Frazzoli, "Sampling-based algorithms for optimal motion planning," *IJRR* 2011.
 - **Informed RRT\***: Gammell, Srinivasa & Barfoot, "Informed RRT\*: Optimal Sampling-based Path Planning Focused via Direct Sampling of an Admissible Ellipsoidal Heuristic," *IROS* 2014.
