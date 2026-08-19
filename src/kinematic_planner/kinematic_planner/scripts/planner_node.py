@@ -137,7 +137,13 @@ def build_collision_fn(robot_config, link_shapes, obstacle_geom, rtb_model,
                                 logger.error(f"Error checking {link_name} against an obstacle: {e}")
                             return False
 
-            if check_self_collision(link_fcl_objects, self_collision_pairs):
+            try:
+                if check_self_collision(link_fcl_objects, self_collision_pairs):
+                    return False
+            except Exception as e:
+                logger = get_logger()
+                if logger is not None:
+                    logger.error(f"Error checking self-collision: {e}")
                 return False
 
         return True

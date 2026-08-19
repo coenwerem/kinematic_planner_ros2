@@ -105,3 +105,43 @@ def test_collision_fn_returns_false_and_logs_when_obstacle_conversion_raises():
     node.path_q = [node.q]
     assert fn(node) is False
     assert logger.errors
+
+
+class _SucceedingRTBModel:
+    """Stands in for an rtb_model whose fkine() succeeds trivially, so
+    collision_fn reaches the self-collision layer without tripping the
+    per-link FK fail-safe above it."""
+
+    def fkine(self, q, end=None, include_base=True):
+        class _SE3:
+            A = np.eye(4)
+        return _SE3()
+
+
+def test_collision_fn_returns_false_and_logs_when_self_collision_check_raises(monkeypatch):
+    """The self-collision layer must fail safe the same way the other three
+    FCL-touching layers in collision_fn already do: an exception raised by
+    check_self_collision must not propagate out of collision_fn into
+    RRTStar.plan() and crash the /joint_states callback."""
+    import kinematic_planner.scripts.planner_node as planner_node_module
+
+    def _raising_check_self_collision(link_fcl_objects, collision_pairs):
+        raise RuntimeError("self-collision check failed")
+
+    monkeypatch.setattr(planner_node_module, "check_self_collision", _raising_check_self_collision)
+
+    logger = _LoggerSpy()
+    fn = build_collision_fn(
+        robot_config=_FakeRobotConfig(),
+        link_shapes={"link1": []},
+        obstacle_geom=_FakeObstacleGeom(),
+        rtb_model=_SucceedingRTBModel(),
+        collision_checker="proximity",
+        min_obs_dist=0.1,
+        check_collision=True,
+        get_logger=lambda: logger,
+    )
+    node = TreeNode(np.array([0.0, 0.0, 0.0]))
+    node.path_q = [node.q]
+    assert fn(node) is False
+    assert logger.errors
