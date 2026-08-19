@@ -1,13 +1,14 @@
 # kinematic_planner_ros2
 
-![RRT* finding a collision-free path for the example 3R arm, weaving between two obstacles](media/rrt_star_3r_demo.gif)
+![RRT* threading the 7-DOF xArm7 through a narrow-passage obstacle cluster, rendered in MuJoCo](media/xarm7_demo.gif)
 
 A suite of ROS 2 packages implementing **RRT\*** and **Informed RRT\*** path planning for robot manipulators, built from scratch with no MoveIt dependency: collision checking runs directly against the
 [Flexible Collision Library (FCL)](https://github.com/humanoid-path-planner/hpp-fcl), forward kinematics use the [Robotics Toolbox for Python](https://github.com/petercorke/robotics-toolbox-python), and the robot is described entirely by a URDF, so any URDF-described manipulator plugs in without SRDF files or a MoveIt config package.
 
-The included example robot is a 3-DOF serial manipulator (3R arm).
 The planner supports any N-DOF robot whose links use **convex collision primitives**
-(box, cylinder, sphere) in their URDF `<collision>` elements.
+(box, cylinder, sphere) in their URDF `<collision>` elements — proven above on
+the 7-DOF [xArm7](#realistic-robot-example-xarm7) and, as a smaller reference
+example kept in the repo, a 3-DOF serial manipulator (3R arm).
 
 ---
 
@@ -20,6 +21,53 @@ The planner supports any N-DOF robot whose links use **convex collision primitiv
 | Forward kinematics | Robotics Toolbox `ERobot` loaded from URDF |
 | Generic robot interface | `robot/robot_config.py` — parses joint limits, link names, and kinematic topology from a raw URDF string using stdlib `xml.etree`; no external config files needed |
 | Robot-agnostic obstacle scene | `scripts/obstacle_publisher.py` — all geometry parameters are ROS 2 parameters, nothing hardcoded |
+
+---
+
+## Realistic robot example: xArm7
+
+The hero GIF at the top runs the exact same planning stack (`RobotConfig`,
+`build_collision_fn`, `RRTStar`) against `xarm7_description`'s 7-DOF xArm7
+URDF, no code changes required — proof that the "any URDF-described
+manipulator" claim above holds for more than the bundled 3R arm. The scene
+is a narrow-passage obstacle cluster sized to the arm's reach, standing on
+a small mounting table.
+
+MuJoCo (not RViz or the matplotlib renderer used for the 3R demo) is the
+sim/render backend here: `tools/render_xarm7_demo.py` builds a MuJoCo model
+directly from the xArm7 URDF (MuJoCo's own URDF importer, with the visual
+meshes kept), adds the table and obstacles as extra MuJoCo bodies at the
+exact same positions the real FCL-based `collision_fn` checks against, then
+drives the model's joint positions frame by frame along the interpolated
+RRT\* path and records MuJoCo's offscreen renderer. The recording is
+kinematic playback, not a dynamics simulation: the script sets joint
+positions directly rather than driving them through actuator control or
+physics integration, so the recording validates neither torque, contact
+forces, nor timing.
+
+The script prints, rather than silently assumes, the properties the demo
+is meant to prove: the naive straight-line interpolation between start
+and goal is genuinely in collision (proving the obstacles forced a real
+detour), every waypoint RRT\* returned is itself collision-free, and the
+path starts and ends exactly at the requested configurations.
+
+Reproduce the recording (needs `mujoco`; see [Prerequisites](#prerequisites)):
+
+```bash
+colcon build --packages-select xarm7_description kinematic_planner_interfaces robot_3r_description kinematic_planner
+source install/setup.bash
+python3 tools/render_xarm7_demo.py
+```
+
+`src/xarm7_description/urdf/xarm7.urdf` and its meshes are copied from the
+MIT-licensed [`frogger`](https://github.com/albertli24/frogger) project's
+`models/xarm7/` directory; see `src/xarm7_description/NOTICE.md` for exact
+provenance and the one line added to the URDF, a MuJoCo-only compiler
+directive that has no effect on ROS or FCL. The arm's own collision
+geometry is convex primitives (cylinders and spheres), not meshes — mesh
+collision support exists in `collision/robot_collision_model.py` and is
+covered by `test/collision/test_robot_collision_model.py`, but the xArm7
+URDF's own collision geometry does not exercise the mesh path.
 
 ---
 
@@ -45,7 +93,11 @@ kinematic_planner_ros2/
     │           ├── obstacle_publisher.py    # publishes scene obstacles
     │           └── robot_geom_publisher.py  # publishes robot link geometry from URDF
     ├── robot_3r_description/        # URDF/xacro for the example 3R robot
+    ├── xarm7_description/           # xArm7 URDF + meshes (realistic robot example)
     └── kinematic_planner_interfaces/ # custom ROS 2 message definitions
+tools/
+├── render_demo.py           # 3R RRT* demo: matplotlib, no RViz
+└── render_xarm7_demo.py     # xArm7 RRT* demo: MuJoCo sim/render backend
 ```
 
 ---
@@ -77,8 +129,14 @@ pip install \
   spatialmath-python \
   transforms3d \
   trimesh \
+  mujoco \
+  imageio \
   "numpy>=2.0"
 ```
+
+`mujoco` and `imageio` are only needed to render the demo GIFs/MP4s
+(`tools/render_demo.py`, `tools/render_xarm7_demo.py`); the planner and
+tests do not import either.
 
 > **Note on `numpy` 2.x:** `roboticstoolbox-python` releases before 1.2 and
 > `spatialgeometry` releases before 1.3.0 ship compiled extensions built
@@ -118,10 +176,14 @@ source install/setup.bash
 
 ---
 
-## Run
+## Run: the 3R reference example
 
-To watch planning happen live in RViz, showing the final path as markers
-rather than the animated sweep the hero GIF above shows:
+The 3R reference example below is the smaller 3-DOF arm bundled with the
+repo as a quick, dependency-light demo. For the 7-DOF xArm7 MuJoCo demo
+shown at the top, see [Realistic robot example: xArm7](#realistic-robot-example-xarm7).
+
+To watch the 3R arm plan live in RViz, showing the final path as markers
+(not an animated sweep, unlike the MuJoCo demo above):
 
 ```bash
 ros2 launch kinematic_planner planner.launch.py &
@@ -140,9 +202,8 @@ Plan to a specific goal configuration:
 ros2 launch kinematic_planner planner.launch.py goal_config:="[1.5, -0.3, 0.6]"
 ```
 
-Enable the dense obstacle ring (10 obstacles standing on the platform around the robot,
-the scene shown in the hero GIF above); the default `goal_config` is collision-free
-against both scenes:
+Enable the dense obstacle ring (10 obstacles standing on the platform around the robot);
+the default `goal_config` is collision-free against both scenes:
 
 ```bash
 ros2 launch kinematic_planner planner.launch.py is_dense:=true
