@@ -7,8 +7,29 @@ A suite of ROS 2 packages implementing **RRT\*** and **Informed RRT\*** path pla
 
 The planner supports any N-DOF robot whose links use **convex collision primitives**
 (box, cylinder, sphere) in their URDF `<collision>` elements — proven above on
-the 7-DOF [xArm7](#realistic-robot-example-xarm7) and, as a smaller reference
+the 7-DOF [xArm7](#xarm7-example-7-dof) and, as a smaller reference
 example kept in the repo, a 3-DOF serial manipulator (3R arm).
+
+---
+
+## Citation
+
+If `kinematic_planner_ros2`'s planning infrastructure supported your work,
+please cite the software directly (see `CITATION.cff`), and consider
+citing the related paper below:
+
+```bibtex
+@inproceedings{enwerem2026variational,
+  title={Variational Neural Belief Parameterizations for Robust Dexterous Grasping under Multimodal Uncertainty},
+  author={Enwerem, Clinton and Kalyanaraman, Shreya and Baras, John S. and Belta, Calin},
+  booktitle={Proceedings of the IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+  year={2026},
+  eprint={2604.25897},
+  archivePrefix={arXiv},
+  primaryClass={cs.RO},
+  note={Accepted for publication}
+}
+```
 
 ---
 
@@ -24,14 +45,21 @@ example kept in the repo, a 3-DOF serial manipulator (3R arm).
 
 ---
 
-## Realistic robot example: xArm7
+## xArm7 example (7-DOF)
 
 The hero GIF at the top runs the exact same planning stack (`RobotConfig`,
 `build_collision_fn`, `RRTStar`) against `xarm7_description`'s 7-DOF xArm7
 URDF, no code changes required — proof that the "any URDF-described
-manipulator" claim above holds for more than the bundled 3R arm. The scene
-is a narrow-passage obstacle cluster sized to the arm's reach, standing on
-a small mounting table.
+manipulator" claim above holds for more than the bundled 3R arm. Two
+obstacle scenes exist, both standing on a small mounting table sized to
+the arm's reach:
+
+| Scene | Obstacles | Media |
+|---|---|---|
+| `sparse` (default, hero GIF) | 3 short pillars | `media/xarm7_demo.{gif,mp4}` |
+| `tall` | 4 taller pillars, forcing the arm to duck under/around rather than mostly clear over the top | `media/xarm7_tall_demo.{gif,mp4}` |
+
+![RRT* on the xArm7 with 4 taller obstacles, forcing a lower detour](media/xarm7_tall_demo.gif)
 
 MuJoCo (not RViz or the matplotlib renderer used for the 3R demo) is the
 sim/render backend here: `tools/render_xarm7_demo.py` builds a MuJoCo model
@@ -51,12 +79,13 @@ and goal is genuinely in collision (proving the obstacles forced a real
 detour), every waypoint RRT\* returned is itself collision-free, and the
 path starts and ends exactly at the requested configurations.
 
-Reproduce the recording (needs `mujoco`; see [Prerequisites](#prerequisites)):
+Reproduce either recording (needs `mujoco`; see [Prerequisites](#prerequisites)):
 
 ```bash
 colcon build --packages-select xarm7_description kinematic_planner_interfaces robot_3r_description kinematic_planner
 source install/setup.bash
-python3 tools/render_xarm7_demo.py
+python3 tools/render_xarm7_demo.py --scene sparse   # default if --scene is omitted
+python3 tools/render_xarm7_demo.py --scene tall
 ```
 
 `src/xarm7_description/urdf/xarm7.urdf` and its meshes are copied from the
@@ -298,27 +327,6 @@ in its URDF `<collision>` elements.  Mesh-based collision geometry is not suppor
 - **RRT\***: Karaman & Frazzoli, "Sampling-based algorithms for optimal motion planning," *IJRR* 2011.
 - **Informed RRT\***: Gammell, Srinivasa & Barfoot, "Informed RRT\*: Optimal Sampling-based Path Planning Focused via Direct Sampling of an Admissible Ellipsoidal Heuristic," *IROS* 2014.
 - Implementation structure adapted from [AtsushiSakai/PythonRobotics](https://github.com/AtsushiSakai/PythonRobotics).
-
----
-
-## Citation
-
-If `kinematic_planner_ros2`'s planning infrastructure supported your work,
-please cite the software directly (see `CITATION.cff`), and consider
-citing the related paper below:
-
-```bibtex
-@inproceedings{enwerem2026variational,
-  title={Variational Neural Belief Parameterizations for Robust Dexterous Grasping under Multimodal Uncertainty},
-  author={Enwerem, Clinton and Kalyanaraman, Shreya and Baras, John S. and Belta, Calin},
-  booktitle={Proceedings of the IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
-  year={2026},
-  eprint={2604.25897},
-  archivePrefix={arXiv},
-  primaryClass={cs.RO},
-  note={Accepted for publication}
-}
-```
 
 ---
 
