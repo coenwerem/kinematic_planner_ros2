@@ -14,7 +14,9 @@ are importable/findable.
 
 Usage:
     python3 tools/render_demo.py
+    python3 tools/render_demo.py --elev 30 --azim -120 --out-dir media/_variants --out-name variant_a
 """
+import argparse
 import os
 import subprocess
 import sys
@@ -197,22 +199,23 @@ def scene_bounds(rtb_model, link_shapes, link_names, frames_q, obstacles, ee_pat
     return corners.min(axis=0), corners.max(axis=0)
 
 
-VIEW_ELEV, VIEW_AZIM = 24, -50
+VIEW_ELEV, VIEW_AZIM = 38, -50
 
 
-def _camera_direction():
-    elev, azim = np.radians(VIEW_ELEV), np.radians(VIEW_AZIM)
+def _camera_direction(elev=VIEW_ELEV, azim=VIEW_AZIM):
+    elev, azim = np.radians(elev), np.radians(azim)
     return np.array([np.cos(elev) * np.cos(azim), np.cos(elev) * np.sin(azim), np.sin(elev)])
 
 
-def draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, obstacles, ee_path_so_far, bounds):
+def draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, obstacles, ee_path_so_far, bounds,
+               elev=VIEW_ELEV, azim=VIEW_AZIM):
     ax.clear()
     # matplotlib's Poly3DCollection z-ordering is a rough painter's algorithm
     # (per-collection centroid, not a real depth buffer) and gets small
     # objects sitting flush on a large flat face -- like link0 resting on
     # base_link's top -- backwards. Draw explicitly farthest-from-camera
     # first so nearer boxes always occlude farther ones correctly.
-    view_dir = _camera_direction()
+    view_dir = _camera_direction(elev, azim)
     boxes = list(link_boxes_world(rtb_model, link_shapes, link_names, q))
     boxes = [(name, c, s, r, "link") for name, c, s, r in boxes]
     boxes += [(None, np.array(pos), size, np.eye(3), "obstacle") for pos, size in obstacles]
@@ -237,14 +240,24 @@ def draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, obstacles
     ax.set_zlim(0.0, hi[2] + pad)
     extent = hi - lo
     ax.set_box_aspect((extent[0] + 2 * pad, extent[1] + 2 * pad, hi[2] + pad))
-    ax.view_init(elev=VIEW_ELEV, azim=VIEW_AZIM)
+    ax.view_init(elev=elev, azim=azim)
     ax.set_axis_off()
     for pane in (ax.xaxis.pane, ax.yaxis.pane, ax.zaxis.pane):
         pane.set_alpha(0.0)
 
 
 def main():
-    os.makedirs(OUT_DIR, exist_ok=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--elev", type=float, default=VIEW_ELEV)
+    parser.add_argument("--azim", type=float, default=VIEW_AZIM)
+    parser.add_argument("--out-dir", default=OUT_DIR)
+    parser.add_argument("--out-name", default="rrt_star_3r", help="base name; produces <name>_demo.{gif,mp4} and <name>_poster.png")
+    args = parser.parse_args()
+    elev, azim = args.elev, args.azim
+    out_dir = args.out_dir
+    out_name = args.out_name
+
+    os.makedirs(out_dir, exist_ok=True)
     urdf_str = load_urdf_string()
 
     robot_config = RobotConfig.from_urdf(urdf_str, base_link_name="base_link")
@@ -293,10 +306,11 @@ def main():
     ax.computed_zorder = False
     ax.set_facecolor("#1c1f26")
     frame_paths = []
-    frame_dir = os.path.join(OUT_DIR, "_frames")
+    frame_dir = os.path.join(out_dir, f"_frames_{out_name}")
     os.makedirs(frame_dir, exist_ok=True)
     for i, q in enumerate(frames_q):
-        draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, obstacles, ee_path[:i + 1], bounds)
+        draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, obstacles, ee_path[:i + 1], bounds,
+                   elev=elev, azim=azim)
         path_png = os.path.join(frame_dir, f"frame_{i:04d}.png")
         fig.savefig(path_png, facecolor="#1c1f26")
         frame_paths.append(path_png)
@@ -308,12 +322,12 @@ def main():
         frame_paths.append(hold_png)
     plt.close(fig)
 
-    gif_path = os.path.join(OUT_DIR, "rrt_star_3r_demo.gif")
+    gif_path = os.path.join(out_dir, f"{out_name}_demo.gif")
     images = [imageio.imread(p) for p in frame_paths]
     imageio.mimsave(gif_path, images, fps=PLAYBACK_FPS, loop=0)
     print(f"wrote {gif_path}")
 
-    mp4_path = os.path.join(OUT_DIR, "rrt_star_3r_demo.mp4")
+    mp4_path = os.path.join(out_dir, f"{out_name}_demo.mp4")
     subprocess.run([
         "ffmpeg", "-y", "-framerate", str(PLAYBACK_FPS), "-i", os.path.join(frame_dir, "frame_%04d.png"),
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
@@ -321,7 +335,7 @@ def main():
     ], check=True)
     print(f"wrote {mp4_path}")
 
-    poster_path = os.path.join(OUT_DIR, "rrt_star_3r_poster.png")
+    poster_path = os.path.join(out_dir, f"{out_name}_poster.png")
     imageio.imwrite(poster_path, images[len(frames_q) - 1])
     print(f"wrote {poster_path}")
 
