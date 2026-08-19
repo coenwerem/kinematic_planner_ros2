@@ -29,6 +29,7 @@ import random
 import subprocess
 import tempfile
 import os
+import xml.etree.ElementTree as ET
 
 from robot_3r_interfaces.msg import JointWaypoint, JointSpacePath
 from robot_3r_interfaces.msg import SceneObstacles, RigidBodyGeom
@@ -41,7 +42,10 @@ from typing import Dict
 
 import fcl
 from kinematic_planner.robot.robot_config import RobotConfig
-from kinematic_planner.collision.collision_utils import obstacle_to_fclobj, create_fcl_object, se3_to_pose_stamped
+from kinematic_planner.robot.joint_state_utils import remap_joint_state
+from kinematic_planner.collision.collision_utils import obstacle_to_fclobj, se3_to_pose_stamped
+from kinematic_planner.collision.robot_collision_model import build_link_collision_shapes, link_shapes_to_fcl_objects
+from kinematic_planner.collision.self_collision import check_self_collision
 from kinematic_planner.planning.rrt_star import RRTStar
 from kinematic_planner.planning.tree import TreeNode
 
@@ -62,108 +66,80 @@ def _build_rtb_model(urdf_path: str):
     return _RobotModel(urdf_path)
 
 
-class _NullClockNode:
-    """Supplies get_clock() for se3_to_pose_stamped() outside an rclpy.Node.
-
-    se3_to_pose_stamped() only reads the returned clock to stamp a
-    PoseStamped header, and create_fcl_object() (the only downstream
-    consumer of that PoseStamped in build_collision_fn) reads only
-    pose.pose.position/orientation, never the header/stamp. A single
-    cached Clock is therefore safe to share across every call.
-    """
-
-    def __init__(self):
-        from rclpy.clock import Clock
-        self._clock = Clock()
-
-    def get_clock(self):
-        return self._clock
-
-
-# Single module-level instance reused by build_collision_fn's collision_fn
-# closure so the per-link, per-waypoint hot loop does not allocate a new
-# _NullClockNode/Clock on every call.
-_NULL_CLOCK_NODE = _NullClockNode()
-
-
-def build_collision_fn(robot_config, robot_geom, obstacle_geom, rtb_model,
+def build_collision_fn(robot_config, link_shapes, obstacle_geom, rtb_model,
                         collision_checker: str, min_obs_dist: float,
                         check_collision: bool, get_logger=lambda: None):
     """Build a collision_fn closure for kinematic_planner.planning.
 
     check_collision=False returns a closure reporting collision-free
-    unconditionally, before any FCL/robot_geom code runs. RRTPlannerBase
+    unconditionally, before any FCL/link_shapes code runs. RRTPlannerBase
     (kinematic_planner.planning.tree) never reads check_collision itself;
     build_collision_fn is the single call site consuming check_collision.
+
+    link_shapes (kinematic_planner.collision.robot_collision_model output)
+    replaces the RigidBodyGeom/SolidPrimitive message path: every
+    <collision> element per link is checked, each carrying its own local
+    origin transform, instead of only the first element at the raw link
+    frame. Self-collision runs alongside robot-obstacle checking through
+    the same per-waypoint FK, using RobotConfig.get_collision_pairs() for
+    the pairs to check.
     """
     if not check_collision:
         return lambda _node: True
+
+    link_names = list(link_shapes.keys())
+    self_collision_pairs = robot_config.get_collision_pairs()
 
     def collision_fn(candidate_node: TreeNode) -> bool:
         try:
             obs_fcl_objects = list(obstacle_to_fclobj(obstacles=obstacle_geom))
         except Exception as e:
-            # fail-safe, matching the per-link except below: a malformed
-            # obstacle_geom message must not propagate out of collision_fn
-            # and crash the /joint_states callback, so treat candidate_node
-            # as in collision.
             logger = get_logger()
             if logger is not None:
                 logger.error(f"Error converting obstacle geometry: {e}")
             return False
+
         for q in candidate_node.path_q:
             rtb_model.q = q
-            for link in rtb_model.links:
-                link_name = link.name
-                skip_names = [robot_config.base_link_name, "link0", robot_config.world_frame]
-                if link_name in skip_names:
-                    continue
-                if link_name not in robot_geom.link_names:
-                    continue
-                idx = robot_geom.link_names.index(link_name)
-                try:
-                    T_fk_se3 = rtb_model.fkine(q, end=link.name, include_base=True)
-                    link_geometry = robot_geom.link_geometries[idx]
-                    if link_geometry.type == SolidPrimitive.BOX:
-                        geom = fcl.Box(*link_geometry.dimensions)
-                    elif link_geometry.type == SolidPrimitive.SPHERE:
-                        geom = fcl.Sphere(link_geometry.dimensions[0])
-                    elif link_geometry.type == SolidPrimitive.CYLINDER:
-                        geom = fcl.Cylinder(link_geometry.dimensions[0], link_geometry.dimensions[1])
-                    else:
-                        continue
-                    rob_pose = se3_to_pose_stamped(
-                        T_fk_se3, _NULL_CLOCK_NODE, frame_id=robot_config.base_link_name,
+            link_fcl_objects = {}
+            try:
+                for link_name in link_names:
+                    T_fk = rtb_model.fkine(q, end=link_name, include_base=True).A
+                    link_fcl_objects[link_name] = link_shapes_to_fcl_objects(
+                        link_shapes[link_name], T_fk,
                     )
-                    rob_obj = create_fcl_object(rob_pose, geom)
+            except Exception as e:
+                logger = get_logger()
+                if logger is not None:
+                    logger.error(f"Error computing FK/geometry for collision check: {e}")
+                return False
+
+            for link_name, robot_objs in link_fcl_objects.items():
+                for rob_obj in robot_objs:
                     for obs_obj in obs_fcl_objects:
-                        if collision_checker == "bvol":
-                            creq = fcl.CollisionRequest()
-                            creq.enable_contact = True
-                            cres = fcl.CollisionResult()
-                            ret = fcl.collide(rob_obj, obs_obj, creq, cres)
-                            collision_found = cres.is_collision or ret > 0
-                            if collision_found:
-                                return False
-                        elif collision_checker == "proximity":
-                            dreq = fcl.DistanceRequest(enable_signed_distance=True)
-                            dres = fcl.DistanceResult()
-                            fcl.distance(rob_obj, obs_obj, dreq, dres)
-                            # single clearance rule, meters, shared with
-                            # informed_rrt_star_node.py through build_collision_fn:
-                            # reject whenever signed distance drops below min_obs_dist.
-                            below_clearance = dres.min_distance < min_obs_dist
-                            if below_clearance:
-                                return False
-                except Exception as e:
-                    # fail-safe: an exception during FK, geometry construction,
-                    # or the FCL check means link_name's collision status could
-                    # not be established, so treat candidate_node as in collision
-                    # rather than let the exception escape into RRTStar.plan().
-                    logger = get_logger()
-                    if logger is not None:
-                        logger.error(f"Error checking {link_name}: {e}")
-                    return False
+                        try:
+                            if collision_checker == "bvol":
+                                creq = fcl.CollisionRequest()
+                                creq.enable_contact = True
+                                cres = fcl.CollisionResult()
+                                ret = fcl.collide(rob_obj, obs_obj, creq, cres)
+                                if cres.is_collision or ret > 0:
+                                    return False
+                            elif collision_checker == "proximity":
+                                dreq = fcl.DistanceRequest(enable_signed_distance=True)
+                                dres = fcl.DistanceResult()
+                                fcl.distance(rob_obj, obs_obj, dreq, dres)
+                                if dres.min_distance < min_obs_dist:
+                                    return False
+                        except Exception as e:
+                            logger = get_logger()
+                            if logger is not None:
+                                logger.error(f"Error checking {link_name} against an obstacle: {e}")
+                            return False
+
+            if check_self_collision(link_fcl_objects, self_collision_pairs):
+                return False
+
         return True
 
     return collision_fn
@@ -262,6 +238,7 @@ class SamplingBasedJSPlanner(Node):
         world_frame = p("world_frame").get_parameter_value().string_value
         self.robot_config = RobotConfig.from_urdf(urdf_str, disabled_pairs=disabled_pairs,
                                                    world_frame=world_frame)
+        self.link_shapes = build_link_collision_shapes(ET.fromstring(urdf_str))
         self.joint_limits = self.robot_config.joint_limits
 
         # ---- load RTB model for FK (writes URDF to a temp file) ---------
@@ -335,13 +312,17 @@ class SamplingBasedJSPlanner(Node):
         if getattr(self, "planning_done", False) or getattr(self, "planning_failed", False):
             return
 
-        self.start_config = msg.position
-        if self.start_config is None or self.obstacle_geom is None or self.robot_geom is None:
+        if self.obstacle_geom is None or self.robot_geom is None:
+            return
+        try:
+            self.start_config = remap_joint_state(msg, self.robot_config.joint_names)
+        except ValueError as e:
+            self.get_logger().error(str(e))
             return
 
         collision_fn = build_collision_fn(
             robot_config=self.robot_config,
-            robot_geom=self.robot_geom,
+            link_shapes=self.link_shapes,
             obstacle_geom=self.obstacle_geom,
             rtb_model=self.rtb_model,
             collision_checker=self.collision_checker,

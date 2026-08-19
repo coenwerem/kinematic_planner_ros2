@@ -8,11 +8,14 @@ class _FakeRobotConfig:
     base_link_name = "base_link"
     world_frame = "world"
 
+    def get_collision_pairs(self):
+        return []
+
 
 def test_check_collision_false_accepts_every_candidate():
     fn = build_collision_fn(
         robot_config=_FakeRobotConfig(),
-        robot_geom=None,
+        link_shapes={},
         obstacle_geom=None,
         rtb_model=None,
         collision_checker="proximity",

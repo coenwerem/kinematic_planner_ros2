@@ -11,11 +11,14 @@ class _FakeRobotConfig:
     base_link_name = "base_link"
     world_frame = "world"
 
+    def get_collision_pairs(self):
+        return []
+
 
 def test_check_collision_false_accepts_every_candidate():
     fn = build_collision_fn(
         robot_config=_FakeRobotConfig(),
-        robot_geom=None,
+        link_shapes={},
         obstacle_geom=None,
         rtb_model=None,
         collision_checker="proximity",
@@ -42,11 +45,6 @@ class _RaisingRTBModel:
         raise RuntimeError("fk failed")
 
 
-class _FakeRobotGeom:
-    link_names = ["link1"]
-    link_geometries = [None]
-
-
 class _FakeObstacleGeom:
     obstacle_ids = []
 
@@ -63,7 +61,7 @@ def test_collision_fn_returns_false_and_logs_on_per_link_exception():
     logger = _LoggerSpy()
     fn = build_collision_fn(
         robot_config=_FakeRobotConfig(),
-        robot_geom=_FakeRobotGeom(),
+        link_shapes={"link1": []},
         obstacle_geom=_FakeObstacleGeom(),
         rtb_model=_RaisingRTBModel(),
         collision_checker="proximity",
@@ -95,7 +93,7 @@ def test_collision_fn_returns_false_and_logs_when_obstacle_conversion_raises():
     logger = _LoggerSpy()
     fn = build_collision_fn(
         robot_config=_FakeRobotConfig(),
-        robot_geom=_FakeRobotGeom(),
+        link_shapes={},
         obstacle_geom=_MalformedObstacleGeom(),
         rtb_model=_RaisingRTBModel(),  # never reached; obstacle conversion fails first
         collision_checker="proximity",
