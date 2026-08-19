@@ -140,3 +140,32 @@ class RRTPlannerBase:
             if node.parent is parent_node:
                 node.cost = calc_new_cost(parent_node, node)
                 self.propagate_cost_to_leaves(node)
+
+    def find_best_goal_node(self, end_node: TreeNode) -> Optional[int]:
+        dist_to_goal = [edge_distance(nd, end_node) for nd in self.config_tree]
+        goal_inds = [i for i, d in enumerate(dist_to_goal) if d <= self.expand_dist]
+        collision_free_goal_inds = []
+        for gi in goal_inds:
+            cand = self.steer(self.config_tree[gi], end_node)
+            if cand is not None and self.collision_fn(cand):
+                collision_free_goal_inds.append(gi)
+        if not collision_free_goal_inds:
+            return None
+        return min(collision_free_goal_inds, key=lambda i: self.config_tree[i].cost)
+
+    def generate_final_course(self, goal_ind: int, end_node: TreeNode) -> List[np.ndarray]:
+        path = [end_node.q]
+        node = self.config_tree[goal_ind]
+        while node.parent is not None:
+            path.append(node.q)
+            node = node.parent
+        path.append(node.q)
+        path.reverse()
+        return path
+
+    @staticmethod
+    def compute_path_cost(path: List[np.ndarray]) -> float:
+        if len(path) < 2:
+            return 0.0
+        arr = np.array(path)
+        return float(np.sum(np.linalg.norm(arr[1:] - arr[:-1], axis=1)))
