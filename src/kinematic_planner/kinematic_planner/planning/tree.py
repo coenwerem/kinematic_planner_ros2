@@ -119,3 +119,24 @@ class RRTPlannerBase:
             return None
         best_cand.cost = min_cost
         return best_cand
+
+    def rewire(self, new_node: TreeNode, near_inds: List[int]) -> None:
+        for i in near_inds:
+            near_node = self.config_tree[i]
+            if near_node is new_node:
+                continue
+            cand = self.steer(new_node, near_node)
+            if cand is None or not self.collision_fn(cand):
+                continue
+            new_cost = calc_new_cost(new_node, near_node)
+            if new_cost < near_node.cost:
+                near_node.parent = new_node
+                near_node.cost = new_cost
+                near_node.path_q = cand.path_q
+                self.propagate_cost_to_leaves(near_node)
+
+    def propagate_cost_to_leaves(self, parent_node: TreeNode) -> None:
+        for node in self.config_tree:
+            if node.parent is parent_node:
+                node.cost = calc_new_cost(parent_node, node)
+                self.propagate_cost_to_leaves(node)
