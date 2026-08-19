@@ -2,9 +2,8 @@
 
 ![RRT* finding a collision-free path for the example 3R arm, weaving between two obstacles](media/rrt_star_3r_demo.gif)
 
-A suite of ROS 2 packages implementing standalone collision-free **RRT\*** and **Informed RRT\*** path planning for robot manipulators, built from the ground-up to serve as an educational complement of the more feature-rich and standard motion planning framework, [MoveIt](https://github.com/moveit/moveit2).  Collision checking uses the
-[Flexible Collision Library (FCL)](https://github.com/humanoid-path-planner/hpp-fcl) directly.
-Forward kinematics use the [Robotics Toolbox for Python](https://github.com/petercorke/robotics-toolbox-python), and the robot is described entirely by a URDF.
+A suite of ROS 2 packages implementing **RRT\*** and **Informed RRT\*** path planning for robot manipulators, built from scratch with no MoveIt dependency: collision checking runs directly against the
+[Flexible Collision Library (FCL)](https://github.com/humanoid-path-planner/hpp-fcl), forward kinematics use the [Robotics Toolbox for Python](https://github.com/petercorke/robotics-toolbox-python), and the robot is described entirely by a URDF, so any URDF-described manipulator plugs in without SRDF files or a MoveIt config package.
 
 The included example robot is a 3-DOF serial manipulator (3R arm).
 The planner supports any N-DOF robot whose links use **convex collision primitives**
@@ -55,16 +54,16 @@ kinematic_planner_ros2/
 
 ### System
 
-- **Ubuntu 22.04** (Jammy) — tested environment
-- **ROS 2 Humble** (desktop install recommended)
+- **Ubuntu 24.04** (Noble) — tested environment
+- **ROS 2 Jazzy** (desktop install recommended)
 - **xacro** — for processing the robot description:
   ```bash
-  sudo apt install ros-humble-xacro
+  sudo apt install ros-jazzy-xacro
   ```
 - **robot_state_publisher** and **joint_state_publisher** — the launch file
   runs both nodes to publish `/robot_description` and a start `/joint_states`:
   ```bash
-  sudo apt install ros-humble-robot-state-publisher ros-humble-joint-state-publisher
+  sudo apt install ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher
   ```
 
 ### Python packages
@@ -108,7 +107,7 @@ pip install python-fcl
 cd kinematic_planner_ros2
 
 # source your ROS 2 installation
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 
 # build all three packages
 colcon build --packages-select kinematic_planner_interfaces robot_3r_description kinematic_planner
@@ -175,6 +174,7 @@ to the goal.
 | Argument | Default | Description |
 |---|---|---|
 | `goal_config` | `[0.8, -0.5, 0.5]` | Goal joint configuration in radians |
+| `algorithm` | `rrt_star` | `rrt_star` or `informed_rrt_star` — which planner node to launch |
 | `is_dense` | `false` | `true` → 10-obstacle ring; `false` → 2 sparse obstacles |
 | `check_collision` | `true` | Enable FCL collision checking |
 | `collision_checker` | `proximity` | `proximity` (signed distance) or `bvol` (bounding volume) |
@@ -195,10 +195,10 @@ All parameters can be overridden at runtime with `--ros-args -p <name>:=<value>`
 |---|---|---|
 | `robot_description` | — | URDF XML string (set by launch file) |
 | `goal_config` | joint-limit midpoints | Goal joint angles in radians |
-| `planning_algorithm` | `rrt_star` | Planning algorithm (`rrt_star` only for now) |
+| `planning_algorithm` | `rrt_star` | Log label only; the launch file's `algorithm` argument picks which node runs, not `planning_algorithm` |
 | `rrts_expand_dist` | `0.3` | Max tree growth per iteration (radians) |
 | `rrts_path_resolution` | `0.1` | Interpolation step size (radians) |
-| `rrts_max_iter` | `300` | Maximum iterations |
+| `rrts_max_iter` | `2000` | Maximum iterations |
 | `rrts_connect_circle_dist` | `20` | Neighbour search radius multiplier |
 | `rrts_search_until_max_iter` | `false` | Keep improving after first solution |
 | `use_goal_biased_sampling` | `false` | Bias sampling toward goal |
