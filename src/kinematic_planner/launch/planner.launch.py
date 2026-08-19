@@ -20,6 +20,7 @@ Usage:
 import os
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import LaunchConfigurationEquals
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -134,6 +135,7 @@ def generate_launch_description():
             "world_frame": LaunchConfiguration("world_frame"),
         }],
         output="screen",
+        condition=LaunchConfigurationEquals("algorithm", "rrt_star"),
     )
 
     informed_rrt_star_node = Node(
@@ -150,13 +152,12 @@ def generate_launch_description():
             "world_frame": LaunchConfiguration("world_frame"),
         }],
         output="screen",
+        condition=LaunchConfigurationEquals("algorithm", "informed_rrt_star"),
     )
 
     return LaunchDescription(declared_args + [
         robot_geom_publisher,
         obstacle_publisher,
-        # Launch whichever planner the user requested via the 'algorithm' arg.
-        # Both nodes are defined above; include both with a condition when
-        # launch conditional logic is needed.  Default brings up RRT*.
         planner_node,
+        informed_rrt_star_node,
     ])
