@@ -16,7 +16,7 @@ The planner supports any N-DOF robot whose links use **convex collision primitiv
 |---|---|
 | Sampling-based planning | Custom RRT\* and Informed RRT\* in `scripts/planner_node.py` and `scripts/informed_rrt_star_node.py` |
 | Collision checking | FCL bounding-volume and signed-distance modes in `collision/collision_utils.py` |
-| Forward kinematics | Robotics Toolbox `ERobot` loaded from URDF; also a custom FK/IK/Jacobian chain in `robot/urdf_parser.py` |
+| Forward kinematics | Robotics Toolbox `ERobot` loaded from URDF |
 | Generic robot interface | `robot/robot_config.py` — parses joint limits, link names, and kinematic topology from a raw URDF string using stdlib `xml.etree`; no external config files needed |
 | Robot-agnostic obstacle scene | `scripts/obstacle_publisher.py` — all geometry parameters are ROS 2 parameters, nothing hardcoded |
 
@@ -33,7 +33,7 @@ kinematic_planner_ros2/
     │   └── kinematic_planner/
     │       ├── robot/
     │       │   ├── robot_config.py  # RobotConfig dataclass; from_urdf() classmethod
-    │       │   └── urdf_parser.py   # custom URDF parser with FK, Jacobian, IK
+    │       │   └── legacy/urdf_parser.py  # educational FK/Jacobian/IK reference, not used at runtime
     │       ├── collision/
     │       │   └── collision_utils.py  # FCL helpers
     │       └── scripts/
