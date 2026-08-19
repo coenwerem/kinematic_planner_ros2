@@ -41,6 +41,7 @@ from kinematic_planner.collision.robot_collision_model import (
 from kinematic_planner.planning.interpolate import interpolate_waypoints
 from kinematic_planner.planning.rrt_star import RRTStar
 from kinematic_planner.robot.robot_config import RobotConfig
+from kinematic_planner.scripts.obstacle_publisher import default_obstacle_scene
 from kinematic_planner.scripts.planner_node import _build_rtb_model, build_collision_fn
 import xml.etree.ElementTree as ET
 
@@ -49,7 +50,9 @@ from shape_msgs.msg import SolidPrimitive
 from geometry_msgs.msg import PoseStamped
 
 START = [0.0, 0.0, 0.0]
-GOAL = [1.5093, 0.6072, 1.4052]
+GOAL = [-1.5, 0.5, -0.9]
+PLATFORM_HEIGHT = 0.755
+IS_DENSE = True
 MIN_OBS_DIST = 0.1
 RRTS_MAX_ITER = 2000
 RANDOM_SEED = 42
@@ -57,17 +60,25 @@ STEPS_PER_SEGMENT = 5
 PLAYBACK_FPS = 15
 HOLD_FRAMES = 10
 OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "media")
-BOX_SIZE = (0.1, 0.1, 1.0)
-OBSTACLE_POSITIONS = [(0.0, 0.6, 0.5), (0.6, 0.0, 0.5)]
 
 
-def sparse_obstacle_scene() -> SceneObstacles:
+def obstacle_positions_and_sizes():
+    positions, sizes = default_obstacle_scene(is_dense=IS_DENSE, platform_height=PLATFORM_HEIGHT)
+    n = len(positions) // 3
+    return (
+        [tuple(positions[3 * i:3 * i + 3]) for i in range(n)],
+        [tuple(sizes[3 * i:3 * i + 3]) for i in range(n)],
+    )
+
+
+def obstacle_scene() -> SceneObstacles:
+    positions, sizes = obstacle_positions_and_sizes()
     scene = SceneObstacles()
     boxes, poses, ids = [], [], []
-    for i, pos in enumerate(OBSTACLE_POSITIONS):
+    for i, (pos, size) in enumerate(zip(positions, sizes)):
         box = SolidPrimitive()
         box.type = SolidPrimitive.BOX
-        box.dimensions = list(BOX_SIZE)
+        box.dimensions = list(size)
         pose = PoseStamped()
         pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = pos
         pose.pose.orientation.w = 1.0
@@ -156,7 +167,7 @@ def link_boxes_world(rtb_model, link_shapes, link_names, q):
     return boxes
 
 
-def scene_bounds(rtb_model, link_shapes, link_names, frames_q, obstacle_positions):
+def scene_bounds(rtb_model, link_shapes, link_names, frames_q, obstacles):
     """Axis-aligned bounds covering every link box across the whole
     animation plus the (static) obstacles, so the camera framing never
     clips or jumps between frames."""
@@ -165,22 +176,22 @@ def scene_bounds(rtb_model, link_shapes, link_names, frames_q, obstacle_position
         for _, center, size, rotation in link_boxes_world(rtb_model, link_shapes, link_names, q):
             for face in box_faces(center, size, rotation):
                 corners.extend(face)
-    for pos in obstacle_positions:
-        for face in box_faces(pos, BOX_SIZE):
+    for pos, size in obstacles:
+        for face in box_faces(pos, size):
             corners.extend(face)
     corners = np.array(corners)
     return corners.min(axis=0), corners.max(axis=0)
 
 
-def draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, obstacle_positions, bounds):
+def draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, obstacles, bounds):
     ax.clear()
     for link_name, center, size, rotation in link_boxes_world(rtb_model, link_shapes, link_names, q):
         faces = box_faces(center, size, rotation)
         ax.add_collection3d(Poly3DCollection(
             faces, facecolor=link_colors[link_name], edgecolor="#10131a", linewidths=0.6, alpha=0.95,
         ))
-    for pos in obstacle_positions:
-        faces = box_faces(pos, BOX_SIZE)
+    for pos, size in obstacles:
+        faces = box_faces(pos, size)
         ax.add_collection3d(Poly3DCollection(
             faces, facecolor="#e0872a", edgecolor="#7a4712", linewidths=0.6, alpha=0.9,
         ))
@@ -206,10 +217,12 @@ def main():
     link_colors = parse_link_colors(ET.fromstring(urdf_str))
     rtb_model = _build_rtb_model_from_string(urdf_str)
 
+    positions, sizes = obstacle_positions_and_sizes()
+    obstacles = list(zip(positions, sizes))
     collision_fn = build_collision_fn(
         robot_config=robot_config,
         link_shapes=link_shapes,
-        obstacle_geom=sparse_obstacle_scene(),
+        obstacle_geom=obstacle_scene(),
         rtb_model=rtb_model,
         collision_checker="proximity",
         min_obs_dist=MIN_OBS_DIST,
@@ -231,7 +244,7 @@ def main():
 
     frames_q = interpolate_waypoints([np.array(q) for q in path], STEPS_PER_SEGMENT)
     link_names = [n for n in link_shapes if n != robot_config.base_link_name] + [robot_config.base_link_name]
-    bounds = scene_bounds(rtb_model, link_shapes, link_names, frames_q, OBSTACLE_POSITIONS)
+    bounds = scene_bounds(rtb_model, link_shapes, link_names, frames_q, obstacles)
 
     fig = plt.figure(figsize=(8, 6), dpi=110)
     fig.patch.set_facecolor("#1c1f26")
@@ -241,7 +254,7 @@ def main():
     frame_dir = os.path.join(OUT_DIR, "_frames")
     os.makedirs(frame_dir, exist_ok=True)
     for i, q in enumerate(frames_q):
-        draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, OBSTACLE_POSITIONS, bounds)
+        draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, obstacles, bounds)
         path_png = os.path.join(frame_dir, f"frame_{i:04d}.png")
         fig.savefig(path_png, facecolor="#1c1f26")
         frame_paths.append(path_png)

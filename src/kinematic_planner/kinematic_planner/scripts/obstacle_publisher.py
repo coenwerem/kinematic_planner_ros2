@@ -22,6 +22,34 @@ import math
 import itertools
 
 
+def default_obstacle_scene(is_dense, platform_height, num_obstacles=10, radius=0.45, center_z=0.5):
+    """Positions and sizes for the built-in demo obstacle scenes, both
+    resting on top of the robot's mounting platform (bottom face at
+    platform_height) rather than floating through it at platform_height
+    + center_z * height. center_z is the fraction of each obstacle's own
+    height between its bottom face and its center pose (0.5 for centered).
+
+    Returns (positions, sizes), each a flat list of 3 floats per obstacle,
+    matching ObstaclePublisher's obstacle_positions/obstacle_sizes
+    parameter layout.
+    """
+    if is_dense:
+        obs_heights = [1.0, 0.8]
+        positions, sizes = [], []
+        for i in range(num_obstacles):
+            angle = 2 * math.pi * i / num_obstacles
+            x, y = radius * math.cos(angle), radius * math.sin(angle)
+            height = obs_heights[i % 2]
+            side = 0.1 if i % 2 == 0 else 0.15
+            sizes.append([side, side, height])
+            positions.extend([x, y, platform_height + center_z * height])
+        return positions, list(itertools.chain.from_iterable(sizes))
+
+    height = 1.0
+    z = platform_height + center_z * height
+    return [0.0, 0.6, z, 0.6, 0.0, z], [0.1, 0.1, height]
+
+
 class ObstaclePublisher(Node):
     def __init__(self, **kwargs):
         super().__init__("obstacle_publisher", **kwargs)
@@ -34,44 +62,38 @@ class ObstaclePublisher(Node):
         self.declare_parameter("obstacle_type", "box")
         self.declare_parameter("is_dense", False)
 
-        # ---- dense-mode ring geometry — no 3R assumptions ----------------------
+        # ---- obstacle-scene geometry — platform_height is the only value
+        # you need to set per robot (its mounting platform's top height,
+        # e.g. 0.755 for 3R); the rest default to a generic scene ----------
         self.declare_parameter("dense_num_obstacles", 10)
         self.declare_parameter("dense_ring_radius", 0.45)
-        self.declare_parameter("dense_center_z", 0.5)
-        # platform_height is now a required parameter — set it to match your robot's
-        # first link height (e.g. 0.755 for 3R).  Defaults to 0.5 (generic).
-        self.declare_parameter("dense_platform_height", 0.5)
+        self.declare_parameter("center_z", 0.5)
+        self.declare_parameter("platform_height", 0.5)
 
         self.base_link_name = self.get_parameter("base_link_name").get_parameter_value().string_value
         self.world_frame = self.get_parameter("world_frame").get_parameter_value().string_value
         self.is_dense = self.get_parameter("is_dense").get_parameter_value().bool_value
         self.obstacle_type = self.get_parameter("obstacle_type").get_parameter_value().string_value
 
+        center_z = self.get_parameter("center_z").get_parameter_value().double_value
+        platform_height = self.get_parameter("platform_height").get_parameter_value().double_value
         if self.is_dense:
             num_obstacles = self.get_parameter("dense_num_obstacles").get_parameter_value().integer_value
             radius = self.get_parameter("dense_ring_radius").get_parameter_value().double_value
-            center_z = self.get_parameter("dense_center_z").get_parameter_value().double_value
-            platform_height = self.get_parameter("dense_platform_height").get_parameter_value().double_value
-            obs_z = [1.0, 0.8]
-            obstacle_positions = []
-            obstacle_sizes = []
-            for i in range(num_obstacles):
-                angle = 2 * math.pi * i / num_obstacles
-                x = radius * math.cos(angle)
-                y = radius * math.sin(angle)
-                if i % 2 == 0:
-                    obstacle_sizes.append([0.1, 0.1, obs_z[0]])
-                    obstacle_positions.extend([x, y, center_z * obs_z[i % 2]])
-                else:
-                    obstacle_sizes.append([0.15, 0.15, obs_z[1]])
-                    obstacle_positions.extend([x, y, platform_height + center_z * obs_z[i % 2]])
+            obstacle_positions, obstacle_sizes = default_obstacle_scene(
+                is_dense=True, platform_height=platform_height,
+                num_obstacles=num_obstacles, radius=radius, center_z=center_z,
+            )
             self.declare_parameter("num_obstacles", num_obstacles)
             self.declare_parameter("obstacle_positions", obstacle_positions)
-            self.declare_parameter("obstacle_sizes", list(itertools.chain.from_iterable(obstacle_sizes)))
+            self.declare_parameter("obstacle_sizes", obstacle_sizes)
         else:
+            obstacle_positions, obstacle_sizes = default_obstacle_scene(
+                is_dense=False, platform_height=platform_height, center_z=center_z,
+            )
             self.declare_parameter("num_obstacles", 2)
-            self.declare_parameter("obstacle_sizes", [0.1, 0.1, 1.0])
-            self.declare_parameter("obstacle_positions", [0.0, 0.6, 0.5, 0.6, 0.0, 0.5])
+            self.declare_parameter("obstacle_sizes", obstacle_sizes)
+            self.declare_parameter("obstacle_positions", obstacle_positions)
 
         self.num_obstacles = self.get_parameter("num_obstacles").get_parameter_value().integer_value
         self.obstacle_sizes = self.get_parameter("obstacle_sizes").get_parameter_value().double_array_value

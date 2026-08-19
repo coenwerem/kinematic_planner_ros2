@@ -36,8 +36,9 @@ def generate_launch_description():
     declared_args = [
         DeclareLaunchArgument(
             "goal_config",
-            default_value="[1.5093, 0.6072, 1.4052]",
-            description="Goal joint configuration [q1, q2, q3] in radians.",
+            default_value="[0.8, -0.5, 0.5]",
+            description="Goal joint configuration [q1, q2, q3] in radians. "
+                        "Collision-free against both the sparse and dense obstacle scenes.",
         ),
         DeclareLaunchArgument(
             "is_dense",
@@ -84,11 +85,11 @@ def generate_launch_description():
             default_value="base_link",
             description="Robot base link name.",
         ),
-        # Dense-mode obstacle ring parameters (override to match your robot)
+        # Obstacle-scene parameters (override to match your robot)
         DeclareLaunchArgument(
-            "dense_platform_height",
+            "platform_height",
             default_value="0.755",
-            description="Height of the robot's first link (used for dense obstacle ring placement).",
+            description="Height of the robot's mounting platform (obstacles rest on top of it).",
         ),
         DeclareLaunchArgument(
             "dense_ring_radius",
@@ -125,7 +126,7 @@ def generate_launch_description():
             "is_dense": LaunchConfiguration("is_dense"),
             "world_frame": LaunchConfiguration("world_frame"),
             "base_link_name": LaunchConfiguration("base_link_name"),
-            "dense_platform_height": LaunchConfiguration("dense_platform_height"),
+            "platform_height": LaunchConfiguration("platform_height"),
             "dense_ring_radius": LaunchConfiguration("dense_ring_radius"),
         }],
         output="screen",

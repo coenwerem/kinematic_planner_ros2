@@ -138,14 +138,15 @@ ros2 launch kinematic_planner planner.launch.py
 Plan to a specific goal configuration:
 
 ```bash
-ros2 launch kinematic_planner planner.launch.py goal_config:="[1.5093, 0.6072, 1.4052]"
+ros2 launch kinematic_planner planner.launch.py goal_config:="[1.5, -0.3, 0.6]"
 ```
 
-Enable the dense obstacle ring (10 obstacles arranged in a circle around the robot).
-The default `goal_config` sits inside the obstacle ring, so pass a goal outside the ring:
+Enable the dense obstacle ring (10 obstacles standing on the platform around the robot,
+the scene shown in the hero GIF above); the default `goal_config` is collision-free
+against both scenes:
 
 ```bash
-ros2 launch kinematic_planner planner.launch.py is_dense:=true goal_config:="[0.8, -0.5, 0.5]"
+ros2 launch kinematic_planner planner.launch.py is_dense:=true
 ```
 
 ### Informed RRT\* planner
@@ -155,10 +156,7 @@ focuses all subsequent sampling inside the smallest ellipsoid in C-space that ca
 any path of equal or lower cost — converging to the optimum faster than plain RRT\*.
 
 ```bash
-ros2 run kinematic_planner informed_rrt_star_node --ros-args \
-  -p goal_config:="[1.5093, 0.6072, 1.4052]" \
-  -p rrts_search_until_max_iter:=true \
-  -p robot_description:="$(xacro src/robot_3r_description/urdf/robot_3r.urdf.xacro)"
+ros2 launch kinematic_planner planner.launch.py algorithm:=informed_rrt_star
 ```
 
 ### Verify a path was found
@@ -176,15 +174,15 @@ to the goal.
 
 | Argument | Default | Description |
 |---|---|---|
-| `goal_config` | `[1.5093, 0.6072, 1.4052]` | Goal joint configuration in radians |
+| `goal_config` | `[0.8, -0.5, 0.5]` | Goal joint configuration in radians |
 | `is_dense` | `false` | `true` → 10-obstacle ring; `false` → 2 sparse obstacles |
 | `check_collision` | `true` | Enable FCL collision checking |
 | `collision_checker` | `proximity` | `proximity` (signed distance) or `bvol` (bounding volume) |
-| `rrts_max_iter` | `300` | Maximum RRT\* iterations |
+| `rrts_max_iter` | `2000` | Maximum RRT\* iterations |
+| `platform_height` | `0.755` | Height of the robot's mounting platform; obstacles rest on top of the platform |
 | `verbose` | `false` | Print per-iteration planning logs |
 | `world_frame` | `world` | Fixed frame name |
 | `base_link_name` | `base_link` | Robot base link name |
-| `dense_platform_height` | `0.755` | First-link height used for dense obstacle placement (metres) |
 | `dense_ring_radius` | `0.45` | Radius of the dense obstacle ring (metres) |
 
 ---
@@ -226,8 +224,8 @@ All parameters can be overridden at runtime with `--ros-args -p <name>:=<value>`
    ros2 launch kinematic_planner planner.launch.py \
      disabled_collision_pairs:="['base_link:link3']"
    ```
-4. Set `dense_platform_height` to match your robot's first link height if using
-   the dense obstacle mode.
+4. Set `platform_height` to your robot's mounting platform height, so the
+   built-in obstacle scenes rest on top of the platform instead of floating through the platform.
 
 The robot must use **convex collision primitives** (`<box>`, `<cylinder>`, or `<sphere>`)
 in its URDF `<collision>` elements.  Mesh-based collision geometry is not supported.
