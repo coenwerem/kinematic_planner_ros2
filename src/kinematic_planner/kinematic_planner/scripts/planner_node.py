@@ -25,7 +25,6 @@ from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PoseStamped, Pose, Point
 from rclpy.duration import Duration
 import numpy as np
-import math
 import random
 import subprocess
 import tempfile
@@ -38,12 +37,13 @@ from visualization_msgs.msg import Marker, MarkerArray
 from rcl_interfaces.msg import ParameterDescriptor
 import transforms3d as t3d
 import spatialmath as sm
-from typing import List, Dict
-from numpy.typing import NDArray
+from typing import Dict
 
 import fcl
 from kinematic_planner.robot.robot_config import RobotConfig
 from kinematic_planner.collision.collision_utils import obstacle_to_fclobj, create_fcl_object, se3_to_pose_stamped
+from kinematic_planner.planning.rrt_star import RRTStar
+from kinematic_planner.planning.tree import TreeNode
 
 try:
     from roboticstoolbox.robot.ERobot import ERobot
@@ -62,356 +62,79 @@ def _build_rtb_model(urdf_path: str):
     return _RobotModel(urdf_path)
 
 
+class _NullClockNode:
+    """Supplies get_clock() for se3_to_pose_stamped() outside an rclpy.Node."""
+
+    def get_clock(self):
+        from rclpy.clock import Clock
+        return Clock()
+
+
+def build_collision_fn(robot_config, robot_geom, obstacle_geom, rtb_model,
+                        collision_checker: str, min_obs_dist: float,
+                        check_collision: bool, get_logger=lambda: None):
+    """Build a collision_fn closure for kinematic_planner.planning.
+
+    check_collision=False returns a closure reporting collision-free
+    unconditionally, before any FCL/robot_geom code runs. RRTPlannerBase
+    (kinematic_planner.planning.tree) never reads check_collision itself;
+    build_collision_fn is the single call site consuming check_collision.
+    """
+    if not check_collision:
+        return lambda _node: True
+
+    def collision_fn(candidate_node: TreeNode) -> bool:
+        obs_fcl_objects = list(obstacle_to_fclobj(obstacles=obstacle_geom))
+        for q in candidate_node.path_q:
+            rtb_model.q = q
+            for link in rtb_model.links:
+                link_name = link.name
+                skip_names = [robot_config.base_link_name, "link0", robot_config.world_frame]
+                if link_name in skip_names:
+                    continue
+                if link_name not in robot_geom.link_names:
+                    continue
+                idx = robot_geom.link_names.index(link_name)
+                T_fk_se3 = rtb_model.fkine(q, end=link.name, include_base=True)
+                link_geometry = robot_geom.link_geometries[idx]
+                if link_geometry.type == SolidPrimitive.BOX:
+                    geom = fcl.Box(*link_geometry.dimensions)
+                elif link_geometry.type == SolidPrimitive.SPHERE:
+                    geom = fcl.Sphere(link_geometry.dimensions[0])
+                elif link_geometry.type == SolidPrimitive.CYLINDER:
+                    geom = fcl.Cylinder(link_geometry.dimensions[0], link_geometry.dimensions[1])
+                else:
+                    continue
+                rob_pose = se3_to_pose_stamped(
+                    T_fk_se3, _NullClockNode(), frame_id=robot_config.base_link_name,
+                )
+                rob_obj = create_fcl_object(rob_pose, geom)
+                for obs_obj in obs_fcl_objects:
+                    if collision_checker == "bvol":
+                        creq = fcl.CollisionRequest()
+                        creq.enable_contact = True
+                        cres = fcl.CollisionResult()
+                        ret = fcl.collide(rob_obj, obs_obj, creq, cres)
+                        collision_found = cres.is_collision or ret > 0
+                        if collision_found:
+                            return False
+                    elif collision_checker == "proximity":
+                        dreq = fcl.DistanceRequest(enable_signed_distance=True)
+                        dres = fcl.DistanceResult()
+                        fcl.distance(rob_obj, obs_obj, dreq, dres)
+                        # single clearance rule, meters, shared with
+                        # informed_rrt_star_node.py through build_collision_fn:
+                        # reject whenever signed distance drops below min_obs_dist.
+                        below_clearance = dres.min_distance < min_obs_dist
+                        if below_clearance:
+                            return False
+        return True
+
+    return collision_fn
+
+
 class SamplingBasedJSPlanner(Node):
     """ROS2 node wrapper around the RRT* planner."""
-
-    # ------------------------------------------------------------------
-    # Inner class: RRT* algorithm (robot-agnostic; all robot data injected
-    # via constructor or the outer Node instance)
-    # ------------------------------------------------------------------
-    class RRTStar:
-        """
-        RRT* path planning in joint space.
-
-        References:
-        [1] https://www.cs.cmu.edu/afs/cs/academic/class/15494-s12/readings/kuffner_icra2000.pdf
-        [2] https://github.com/AtsushiSakai/PythonRobotics/blob/master/ArmNavigation/
-               rrt_star_seven_joint_arm_control/rrt_star_seven_joint_arm_control.py
-        """
-
-        class RRTStarConfigNode:
-            def __init__(self, q):
-                self.q = np.array(q, dtype=float)
-                self.parent = None
-                self.cost = 0.0
-                self.path_q = []
-
-        def __init__(self, outer_instance: Node, start, goal, robot_geom, expand_dist,
-                     obstacle_geom, rand_area, path_resolution, max_iter,
-                     connect_circle_dist, goal_sample_rate, check_collision_param=True):
-            self.outer = outer_instance
-            self.start = self.RRTStarConfigNode(start)
-            self.start.path_q = [start]
-            self.end = self.RRTStarConfigNode(goal)
-            self.end.path_q = [goal]
-            self.dimension = len(start)
-            self.robot_geom = robot_geom
-            self.min_rand = rand_area[0]
-            self.max_rand = rand_area[1]
-            self.expand_dist = expand_dist
-            self.path_resolution = path_resolution
-            self.goal_sample_rate = goal_sample_rate
-            self.max_iter = max_iter
-            self.obstacle_geom = obstacle_geom
-            self.connect_circle_dist = connect_circle_dist
-            self.config_tree = []
-            self.check_collision_param = check_collision_param
-
-        def sample_free(self):
-            """
-            Sample a random configuration from the collision-free subspace.
-            See Section 7.1 of Spong et al., Robot Dynamics and Control.
-            """
-            try:
-                if self.outer.pl_alg == "rrt_star":
-                    if self.outer.use_goal_biased_sampling:
-                        if np.random.rand() > self.goal_sample_rate:
-                            samp_q = [np.random.uniform(lo, hi) for lo, hi in self.outer.joint_limits]
-                            return self.RRTStarConfigNode(np.array(samp_q))
-                        else:
-                            goal = np.array(self.end.q)
-                            noise = np.random.normal(scale=self.outer.goal_noise_sigma, size=goal.shape)
-                            goal_cand = np.clip(
-                                goal + noise,
-                                [jl[0] for jl in self.outer.joint_limits],
-                                [jl[1] for jl in self.outer.joint_limits]
-                            )
-                            return self.RRTStarConfigNode(goal_cand)
-                    else:
-                        samp_q = [np.random.uniform(lo, hi) for lo, hi in self.outer.joint_limits]
-                        return self.RRTStarConfigNode(np.array(samp_q))
-                elif self.outer.pl_alg == "rrt":
-                    raise NotImplementedError("Plain RRT not yet implemented; use rrt_star.")
-                else:
-                    self.outer.get_logger().warning("Only 'rrt_star' is supported.")
-            except Exception as e:
-                self.outer.get_logger().error(f"sample_free error: {e}")
-
-        def calc_dist_to_goal(self, q):
-            return np.linalg.norm(np.array(q) - np.array(self.end.q))
-
-        def get_nearby_neighbors(self, x_new) -> List[int]:
-            assert self.connect_circle_dist > 2 * (1 + 1 / self.dimension) ** (1 / self.dimension), \
-                "Invalid connect_circle_dist"
-            curr_num_nodes = len(self.config_tree)
-            if curr_num_nodes <= 1:
-                near_radius = self.expand_dist
-            else:
-                near_radius = self.connect_circle_dist * (math.log(curr_num_nodes) / curr_num_nodes) ** (1.0 / self.dimension)
-                if self.expand_dist:
-                    near_radius = min(near_radius, self.expand_dist)
-            dists = [np.sum((nd.q - x_new.q) ** 2) for nd in self.config_tree]
-            return [idx for idx, dist in enumerate(dists) if dist <= near_radius ** 2]
-
-        def choose_best_parent(self, new_node, near_inds):
-            if not near_inds:
-                nearest_idx = self.get_nearest_node_index(self.config_tree, new_node)
-                cand = self.steer(self.config_tree[nearest_idx], new_node)
-                if cand and self.collision_free(cand, self.robot_geom, self.obstacle_geom, self.check_collision_param):
-                    cand.parent = self.config_tree[nearest_idx]
-                    cand.cost = self.config_tree[nearest_idx].cost + self.calc_new_cost(self.config_tree[nearest_idx], cand)
-                    return cand
-                return None
-            costs = []
-            for i in near_inds:
-                near_node = self.config_tree[i]
-                cand = self.steer(near_node, new_node)
-                if cand and self.collision_free(cand, self.robot_geom, self.obstacle_geom, self.check_collision_param):
-                    costs.append(self.calc_new_cost(near_node, cand))
-                else:
-                    costs.append(float("inf"))
-            min_cost = min(costs)
-            if min_cost == float("inf"):
-                self.outer.get_logger().info("No collision-free parent found for new node.")
-                return None
-            min_ind = near_inds[costs.index(min_cost)]
-            new_node = self.steer(self.config_tree[min_ind], new_node)
-            if not new_node:
-                return None
-            new_node.parent = self.config_tree[min_ind]
-            new_node.cost = min_cost
-            return new_node
-
-        def steer(self, x_nearest, x_random):
-            extend_length = self.expand_dist
-            start = np.array(x_nearest.q, dtype=float)
-            goal = np.array(x_random.q, dtype=float)
-            new_node = self.RRTStarConfigNode(start.copy())
-            d, _, _ = self.calc_distance_and_angle(x_nearest, x_random)
-            new_node.path_q = [start]
-            if d == 0.0:
-                return None
-            if extend_length > d:
-                extend_length = d
-            n_expand = max(1, math.floor(extend_length / self.path_resolution))
-            unit_vec = (goal - start) / np.linalg.norm(goal - start)
-            for _ in range(n_expand):
-                new_node.q = new_node.q + unit_vec * self.path_resolution
-                new_node.path_q.append(new_node.q.copy())
-            d_after, _, _ = self.calc_distance_and_angle(new_node, x_random)
-            if d_after <= self.path_resolution:
-                new_node.q = goal.copy()
-                new_node.path_q.append(goal)
-            new_node.parent = x_nearest
-            return new_node
-
-        def rewire(self, new_node, near_inds):
-            for i in near_inds:
-                near_node = self.config_tree[i]
-                cand = self.steer(new_node, near_node)
-                if not cand:
-                    continue
-                no_collision = self.collision_free(cand, self.robot_geom, self.obstacle_geom, self.check_collision_param)
-                cost_improved = cand.cost + self.calc_new_cost(cand, near_node) < near_node.cost
-                if no_collision and cost_improved:
-                    self.config_tree[i] = cand
-                    self.propagate_cost_to_leaves(new_node)
-
-        def find_best_goal_node(self):
-            dist_to_goal_list = [self.calc_dist_to_goal(nd.q) for nd in self.config_tree]
-            goal_inds = [dist_to_goal_list.index(i) for i in dist_to_goal_list if i <= self.expand_dist]
-            collision_free_goal_inds = []
-            for goal_ind in goal_inds:
-                cand = self.steer(self.config_tree[goal_ind], self.end)
-                if cand and self.collision_free(cand, self.robot_geom, self.obstacle_geom, self.check_collision_param):
-                    collision_free_goal_inds.append(goal_ind)
-            if not collision_free_goal_inds:
-                return None
-            min_cost = min([self.config_tree[i].cost for i in collision_free_goal_inds])
-            for i in collision_free_goal_inds:
-                if self.config_tree[i].cost == min_cost:
-                    return i
-            return None
-
-        def propagate_cost_to_leaves(self, parent_node):
-            for node in self.config_tree:
-                if node.parent == parent_node:
-                    node.cost = self.calc_new_cost(parent_node, node)
-                    self.propagate_cost_to_leaves(node)
-
-        def calc_new_cost(self, from_node, to_node):
-            d, _, _ = self.calc_distance_and_angle(from_node, to_node)
-            return from_node.cost + d
-
-        def generate_final_course(self, goal_ind):
-            computed_path = [self.end.q]
-            node = self.config_tree[goal_ind]
-            while node.parent is not None:
-                computed_path.append(node.q)
-                node = node.parent
-            computed_path.append(node.q)
-            computed_path.reverse()
-            return computed_path
-
-        def plan(self):
-            start_free = self.collision_free(self.start, self.robot_geom, self.obstacle_geom, self.check_collision_param)
-            goal_node = self.RRTStarConfigNode(self.outer.goal_config)
-            goal_node.path_q = [self.outer.goal_config]
-            end_free = self.collision_free(goal_node, self.robot_geom, self.obstacle_geom, self.check_collision_param)
-
-            if start_free is not None and end_free is not None:
-                if not start_free or not end_free:
-                    if not start_free:
-                        self.outer.get_logger().warning(f"Start config {np.round(self.start.q, 3)} is in collision!")
-                        self.outer.start_goal_collision = "start"
-                    if not end_free:
-                        self.outer.get_logger().warning(f"Goal config {np.round(self.outer.goal_config, 3)} is in collision!")
-                        self.outer.start_goal_collision = "goal"
-                    return None
-
-            self.config_tree = [self.start]
-            for i in range(self.max_iter):
-                if self.outer.verbose:
-                    self.outer.get_logger().info(f"Iter {i}, tree size: {len(self.config_tree)}")
-                rnd_node = self.sample_free()
-                nearest_ind = self.get_nearest_node_index(self.config_tree, rnd_node)
-                new_node = self.steer(self.config_tree[nearest_ind], rnd_node)
-                if new_node and self.collision_free(new_node, self.robot_geom, self.obstacle_geom, self.check_collision_param):
-                    near_inds = self.get_nearby_neighbors(new_node)
-                    new_node = self.choose_best_parent(new_node, near_inds)
-                    if new_node:
-                        self.config_tree.append(new_node)
-                        self.rewire(new_node, near_inds)
-                if not self.outer.rrts_search_until_max_iter and new_node:
-                    last_index = self.find_best_goal_node()
-                    if last_index is not None:
-                        return self.generate_final_course(last_index)
-
-            self.outer.get_logger().info(f"Reached max iteration ({self.max_iter}).")
-            last_index = self.find_best_goal_node()
-            if last_index is not None:
-                return self.generate_final_course(last_index)
-            return None
-
-        def collision_free(self, candidate_node, robot_geom: RigidBodyGeom,
-                           obstacles: SceneObstacles, check_collision: bool = True) -> bool:
-            if not check_collision:
-                self.outer.get_logger().warning("check_collision=False; path validity not guaranteed.")
-                return False
-
-            nodes_to_check = []
-            try:
-                nodes_to_check = [SamplingBasedJSPlanner.RRTStar.RRTStarConfigNode(n) for n in candidate_node.path_q]
-            except Exception as e:
-                self.outer.get_logger().error(f"Error creating collision check nodes: {e}")
-                return False
-
-            obs_fcl_objects = list(obstacle_to_fclobj(obstacles=obstacles))
-            rtb_model = self.outer.rtb_model
-            collision_detected = False
-
-            for c_node in nodes_to_check:
-                q = c_node.q
-                rtb_model.q = q
-
-                for link in rtb_model.links:
-                    link_name = link.name
-                    if link_name in [self.outer.robot_config.base_link_name, 'link0',
-                                     self.outer.robot_config.world_frame]:
-                        continue
-                    try:
-                        idx = robot_geom.link_names.index(link_name)
-                    except ValueError:
-                        continue
-
-                    try:
-                        T_fk_se3 = rtb_model.fkine(q, end=link.name, include_base=True)
-                        link_geometry = robot_geom.link_geometries[idx]
-                        if link_geometry.type == SolidPrimitive.BOX:
-                            x, y, z = link_geometry.dimensions
-                            geom = fcl.Box(x, y, z)
-                        elif link_geometry.type == SolidPrimitive.SPHERE:
-                            geom = fcl.Sphere(link_geometry.dimensions[0])
-                        elif link_geometry.type == SolidPrimitive.CYLINDER:
-                            geom = fcl.Cylinder(link_geometry.dimensions[0], link_geometry.dimensions[1])
-                        else:
-                            continue
-
-                        rob_obj = create_fcl_object(
-                            se3_to_pose_stamped(T_fk_se3, self.outer,
-                                                frame_id=self.outer.robot_config.base_link_name),
-                            geom
-                        )
-
-                        for obs_obj in obs_fcl_objects:
-                            if self.outer.collision_checker == 'bvol':
-                                creq = fcl.CollisionRequest()
-                                creq.enable_contact = True
-                                cres = fcl.CollisionResult()
-                                ret = fcl.collide(rob_obj, obs_obj, creq, cres)
-                                if cres.is_collision or ret > 0:
-                                    if self.outer.verbose:
-                                        self.outer.get_logger().info(
-                                            f"Bvol collision: {link_name} at q={np.round(q, 3)}")
-                                    collision_detected = True
-                                    break
-
-                            if self.outer.collision_checker == 'proximity':
-                                dreq = fcl.DistanceRequest(enable_signed_distance=True)
-                                dres = fcl.DistanceResult()
-                                fcl.distance(rob_obj, obs_obj, dreq, dres)
-                                min_dist = dres.min_distance
-                                if min_dist < 0:
-                                    if self.outer.verbose:
-                                        self.outer.get_logger().info(
-                                            f"\033[91mProximity collision: {link_name} at q={np.round(q, 3)}\033[0m")
-                                    self.outer.proximity_alert = True
-                                    collision_detected = True
-                                    break
-                                if min_dist < self.outer.min_obs_dist:
-                                    self.outer.proximity_alert = True
-                                    target_q = self.outer.goal_config
-                                    start_q = self.start.q
-                                    if (np.linalg.norm(q - start_q) < self.outer.min_obs_dist or
-                                            np.linalg.norm(q - target_q) < self.outer.min_obs_dist):
-                                        collision_detected = True
-                                        break
-                                    if self.outer.verbose:
-                                        self.outer.get_logger().info(
-                                            f"Proximity alert: {link_name} at q={np.round(q, 3)}")
-                                    collision_detected = True
-                                    break
-
-                        if collision_detected:
-                            break
-                    except Exception as e:
-                        self.outer.get_logger().error(f"Error checking {link_name}: {e}")
-                        collision_detected = True
-                        break
-
-                if collision_detected:
-                    break
-
-            return not collision_detected
-
-        @staticmethod
-        def get_nearest_node_index(config_tree, rnd_node):
-            dlist = [np.sum((node.q - rnd_node.q) ** 2) for node in config_tree]
-            return dlist.index(min(dlist))
-
-        @staticmethod
-        def calc_distance_and_angle(from_node, to_node):
-            diff = to_node.q - from_node.q
-            d = np.linalg.norm(diff)
-            dx, dy = diff[0], diff[1] if len(diff) > 1 else 0.0
-            dz = diff[2] if len(diff) > 2 else 0.0
-            phi = math.atan2(dy, dx)
-            theta = math.atan2(dz, math.hypot(dx, dy))
-            return d, phi, theta
-
-        @staticmethod
-        def compute_path_cost(path: List[NDArray]) -> float:
-            return sum(np.linalg.norm(path[i] - path[i - 1]) for i in range(1, len(path)))
 
     # ------------------------------------------------------------------
     # Node __init__
@@ -575,24 +298,37 @@ class SamplingBasedJSPlanner(Node):
         if self.start_config is None or self.obstacle_geom is None or self.robot_geom is None:
             return
 
-        self.rrt_star = self.RRTStar(
-            self,
-            start=self.start_config,
-            goal=self.goal_config,
+        collision_fn = build_collision_fn(
+            robot_config=self.robot_config,
             robot_geom=self.robot_geom,
             obstacle_geom=self.obstacle_geom,
-            rand_area=self.rand_area,
+            rtb_model=self.rtb_model,
+            collision_checker=self.collision_checker,
+            min_obs_dist=self.min_obs_dist,
+            check_collision=self.check_collision,
+            get_logger=self.get_logger,
+        )
+        self.rrt_star = RRTStar(
+            start=self.start_config,
+            goal=self.goal_config,
+            joint_limits=self.joint_limits,
             expand_dist=self.rrts_expand_dist,
             path_resolution=self.rrts_path_resolution,
             max_iter=self.rrts_max_iter,
             connect_circle_dist=self.rrts_connect_circle_dist,
             goal_sample_rate=self.rrts_goal_sample_rate,
-            check_collision_param=self.check_collision,
+            collision_fn=collision_fn,
+            use_goal_biased_sampling=self.use_goal_biased_sampling,
+            goal_noise_sigma=self.goal_noise_sigma,
+            search_until_max_iter=self.rrts_search_until_max_iter,
+            rng=np.random.default_rng(self.random_seed),
         )
 
         self.planning_attempts += 1
         self.get_logger().info(f"Planning attempt {self.planning_attempts}/{self.max_planning_attempts}")
         computed_path = self.rrt_star.plan()
+        if self.rrt_star.start_goal_collision:
+            self.start_goal_collision = self.rrt_star.start_goal_collision
 
         if computed_path is None:
             if self.start_goal_collision == "start":
