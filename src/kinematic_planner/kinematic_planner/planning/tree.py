@@ -93,3 +93,34 @@ class RRTPlannerBase:
             new_node.path_q.append(goal.copy())
         new_node.parent = x_nearest
         return new_node
+
+    def choose_best_parent(self, new_node: TreeNode, near_inds: List[int]) -> Optional[TreeNode]:
+        if not near_inds:
+            nearest_idx = self.get_nearest_node_index(self.config_tree, new_node)
+            nearest = self.config_tree[nearest_idx]
+            cand = self.steer(nearest, new_node)
+            if cand is not None and self.collision_fn(cand):
+                cand.parent = nearest
+                cand.cost = calc_new_cost(nearest, cand)
+                return cand
+            return None
+
+        costs = []
+        for i in near_inds:
+            near_node = self.config_tree[i]
+            cand = self.steer(near_node, new_node)
+            if cand is not None and self.collision_fn(cand):
+                costs.append(calc_new_cost(near_node, cand))
+            else:
+                costs.append(float("inf"))
+
+        min_cost = min(costs)
+        if min_cost == float("inf"):
+            return None
+        min_ind = near_inds[costs.index(min_cost)]
+        steered = self.steer(self.config_tree[min_ind], new_node)
+        if steered is None:
+            return None
+        steered.parent = self.config_tree[min_ind]
+        steered.cost = min_cost
+        return steered
