@@ -45,26 +45,26 @@ from shape_msgs.msg import SolidPrimitive
 from geometry_msgs.msg import PoseStamped
 
 START = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-GOAL = [0.2, -0.5, 0.0, 1.0, 0.0, 0.9, 0.0]
+GOAL = [-0.698, -1.107, -1.0, 1.222, 0.356, -0.026, 0.373]
 MIN_OBS_DIST = 0.04
 RRTS_MAX_ITER = 2000
 RANDOM_SEED = 42
-STEPS_PER_SEGMENT = 10
+STEPS_PER_SEGMENT = 6
 PLAYBACK_FPS = 30
-START_HOLD_FRAMES = 20
-HOLD_FRAMES = 40
+START_HOLD_FRAMES = 15
+HOLD_FRAMES = 30
 OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "media")
 
 TABLE_SIZE = (1.1, 1.1, 0.4)
 TABLE_POS = (0.0, 0.0, -0.2)
 OBSTACLES = [
-    {"pos": (0.35, 0.15, 0.2), "size": (0.08, 0.08, 0.4)},
-    {"pos": (0.35, -0.15, 0.2), "size": (0.08, 0.08, 0.4)},
-    {"pos": (0.50, 0.0, 0.15), "size": (0.08, 0.08, 0.3)},
-    {"pos": (0.20, 0.32, 0.2), "size": (0.08, 0.08, 0.4)},
-    {"pos": (0.20, -0.32, 0.2), "size": (0.08, 0.08, 0.4)},
-    {"pos": (0.50, 0.30, 0.18), "size": (0.08, 0.08, 0.36)},
-    {"pos": (0.50, -0.30, 0.18), "size": (0.08, 0.08, 0.36)},
+    {"pos": (0.35, 0.15, 0.3), "size": (0.08, 0.08, 0.6)},
+    {"pos": (0.35, -0.15, 0.3), "size": (0.08, 0.08, 0.6)},
+    {"pos": (0.50, 0.0, 0.25), "size": (0.08, 0.08, 0.5)},
+    {"pos": (0.20, 0.32, 0.3), "size": (0.08, 0.08, 0.6)},
+    {"pos": (0.20, -0.32, 0.3), "size": (0.08, 0.08, 0.6)},
+    {"pos": (0.50, 0.30, 0.275), "size": (0.08, 0.08, 0.55)},
+    {"pos": (0.50, -0.30, 0.275), "size": (0.08, 0.08, 0.55)},
 ]
 ALL_STATIC_BOXES = [{"pos": TABLE_POS, "size": TABLE_SIZE}] + OBSTACLES
 
