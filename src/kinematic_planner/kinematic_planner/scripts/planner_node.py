@@ -95,39 +95,49 @@ def build_collision_fn(robot_config, robot_geom, obstacle_geom, rtb_model,
                 if link_name not in robot_geom.link_names:
                     continue
                 idx = robot_geom.link_names.index(link_name)
-                T_fk_se3 = rtb_model.fkine(q, end=link.name, include_base=True)
-                link_geometry = robot_geom.link_geometries[idx]
-                if link_geometry.type == SolidPrimitive.BOX:
-                    geom = fcl.Box(*link_geometry.dimensions)
-                elif link_geometry.type == SolidPrimitive.SPHERE:
-                    geom = fcl.Sphere(link_geometry.dimensions[0])
-                elif link_geometry.type == SolidPrimitive.CYLINDER:
-                    geom = fcl.Cylinder(link_geometry.dimensions[0], link_geometry.dimensions[1])
-                else:
-                    continue
-                rob_pose = se3_to_pose_stamped(
-                    T_fk_se3, _NullClockNode(), frame_id=robot_config.base_link_name,
-                )
-                rob_obj = create_fcl_object(rob_pose, geom)
-                for obs_obj in obs_fcl_objects:
-                    if collision_checker == "bvol":
-                        creq = fcl.CollisionRequest()
-                        creq.enable_contact = True
-                        cres = fcl.CollisionResult()
-                        ret = fcl.collide(rob_obj, obs_obj, creq, cres)
-                        collision_found = cres.is_collision or ret > 0
-                        if collision_found:
-                            return False
-                    elif collision_checker == "proximity":
-                        dreq = fcl.DistanceRequest(enable_signed_distance=True)
-                        dres = fcl.DistanceResult()
-                        fcl.distance(rob_obj, obs_obj, dreq, dres)
-                        # single clearance rule, meters, shared with
-                        # informed_rrt_star_node.py through build_collision_fn:
-                        # reject whenever signed distance drops below min_obs_dist.
-                        below_clearance = dres.min_distance < min_obs_dist
-                        if below_clearance:
-                            return False
+                try:
+                    T_fk_se3 = rtb_model.fkine(q, end=link.name, include_base=True)
+                    link_geometry = robot_geom.link_geometries[idx]
+                    if link_geometry.type == SolidPrimitive.BOX:
+                        geom = fcl.Box(*link_geometry.dimensions)
+                    elif link_geometry.type == SolidPrimitive.SPHERE:
+                        geom = fcl.Sphere(link_geometry.dimensions[0])
+                    elif link_geometry.type == SolidPrimitive.CYLINDER:
+                        geom = fcl.Cylinder(link_geometry.dimensions[0], link_geometry.dimensions[1])
+                    else:
+                        continue
+                    rob_pose = se3_to_pose_stamped(
+                        T_fk_se3, _NullClockNode(), frame_id=robot_config.base_link_name,
+                    )
+                    rob_obj = create_fcl_object(rob_pose, geom)
+                    for obs_obj in obs_fcl_objects:
+                        if collision_checker == "bvol":
+                            creq = fcl.CollisionRequest()
+                            creq.enable_contact = True
+                            cres = fcl.CollisionResult()
+                            ret = fcl.collide(rob_obj, obs_obj, creq, cres)
+                            collision_found = cres.is_collision or ret > 0
+                            if collision_found:
+                                return False
+                        elif collision_checker == "proximity":
+                            dreq = fcl.DistanceRequest(enable_signed_distance=True)
+                            dres = fcl.DistanceResult()
+                            fcl.distance(rob_obj, obs_obj, dreq, dres)
+                            # single clearance rule, meters, shared with
+                            # informed_rrt_star_node.py through build_collision_fn:
+                            # reject whenever signed distance drops below min_obs_dist.
+                            below_clearance = dres.min_distance < min_obs_dist
+                            if below_clearance:
+                                return False
+                except Exception as e:
+                    # fail-safe: an exception during FK, geometry construction,
+                    # or the FCL check means link_name's collision status could
+                    # not be established, so treat candidate_node as in collision
+                    # rather than let the exception escape into RRTStar.plan().
+                    logger = get_logger()
+                    if logger is not None:
+                        logger.error(f"Error checking {link_name}: {e}")
+                    return False
         return True
 
     return collision_fn
