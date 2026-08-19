@@ -87,6 +87,47 @@ def load_urdf_string() -> str:
     return subprocess.check_output(["xacro", urdf_xacro], text=True)
 
 
+DEFAULT_LINK_COLOR = "#2f6fb0"
+
+
+def parse_link_colors(urdf_root) -> dict:
+    """Map link name -> the link's own <visual><material> color from the
+    URDF, so the render matches the robot's real per-link materials
+    (e.g. base_link is grey, not the same blue as the moving arm links)
+    instead of flattening every link to one made-up color."""
+    named_colors = {}
+    for material_el in urdf_root.findall("material"):
+        name = material_el.get("name")
+        color_el = material_el.find("color")
+        if name and color_el is not None:
+            r, g, b, _a = (float(v) for v in color_el.get("rgba").split())
+            named_colors[name] = "#{:02x}{:02x}{:02x}".format(
+                int(r * 255), int(g * 255), int(b * 255)
+            )
+
+    link_colors = {}
+    for link_el in urdf_root.findall("link"):
+        link_name = link_el.get("name")
+        visual_el = link_el.find("visual")
+        material_el = visual_el.find("material") if visual_el is not None else None
+        material_name = material_el.get("name") if material_el is not None else None
+        hex_color = named_colors.get(material_name, DEFAULT_LINK_COLOR)
+        link_colors[link_name] = _lighten_if_too_dark(hex_color)
+    return link_colors
+
+
+def _lighten_if_too_dark(hex_color, min_channel_max=90, blend_toward_white=0.4):
+    """The URDF's real materials include near-black/dark-grey links (link0,
+    base_link) that would be nearly invisible against a dark render
+    background; blend those toward white a bit while keeping the hue
+    recognizable, and leave already-visible colors untouched."""
+    r, g, b = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
+    if max(r, g, b) >= min_channel_max:
+        return hex_color
+    r, g, b = (int(c + (255 - c) * blend_toward_white) for c in (r, g, b))
+    return "#{:02x}{:02x}{:02x}".format(r, g, b)
+
+
 def box_faces(center, size, rotation=np.eye(3)):
     dx, dy, dz = np.array(size) / 2.0
     corners = np.array([
@@ -131,12 +172,12 @@ def scene_bounds(rtb_model, link_shapes, link_names, frames_q, obstacle_position
     return corners.min(axis=0), corners.max(axis=0)
 
 
-def draw_scene(ax, rtb_model, link_shapes, link_names, q, obstacle_positions, bounds):
+def draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, obstacle_positions, bounds):
     ax.clear()
-    for _, center, size, rotation in link_boxes_world(rtb_model, link_shapes, link_names, q):
+    for link_name, center, size, rotation in link_boxes_world(rtb_model, link_shapes, link_names, q):
         faces = box_faces(center, size, rotation)
         ax.add_collection3d(Poly3DCollection(
-            faces, facecolor="#2f6fb0", edgecolor="#173a5e", linewidths=0.6, alpha=0.95,
+            faces, facecolor=link_colors[link_name], edgecolor="#10131a", linewidths=0.6, alpha=0.95,
         ))
     for pos in obstacle_positions:
         faces = box_faces(pos, BOX_SIZE)
@@ -162,6 +203,7 @@ def main():
 
     robot_config = RobotConfig.from_urdf(urdf_str, base_link_name="base_link")
     link_shapes = build_link_collision_shapes(ET.fromstring(urdf_str))
+    link_colors = parse_link_colors(ET.fromstring(urdf_str))
     rtb_model = _build_rtb_model_from_string(urdf_str)
 
     collision_fn = build_collision_fn(
@@ -199,7 +241,7 @@ def main():
     frame_dir = os.path.join(OUT_DIR, "_frames")
     os.makedirs(frame_dir, exist_ok=True)
     for i, q in enumerate(frames_q):
-        draw_scene(ax, rtb_model, link_shapes, link_names, q, OBSTACLE_POSITIONS, bounds)
+        draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, OBSTACLE_POSITIONS, bounds)
         path_png = os.path.join(frame_dir, f"frame_{i:04d}.png")
         fig.savefig(path_png, facecolor="#1c1f26")
         frame_paths.append(path_png)
