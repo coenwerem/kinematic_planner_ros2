@@ -16,3 +16,6 @@ log/
 # Python bytecode cache
 __pycache__/
 *.pyc
+
+# internal dev/planning notes, not part of the public deliverable
+docs/
