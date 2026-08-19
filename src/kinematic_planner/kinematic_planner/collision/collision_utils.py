@@ -18,9 +18,12 @@ def robotgeom_to_fclobj(robot_geom: RigidBodyGeom):
         if link_geometry_type == SolidPrimitive.BOX:
             fcl_geom = fcl.Box(*link_geometry.dimensions)
         elif link_geometry_type == SolidPrimitive.SPHERE:
-            fcl_geom = fcl.Sphere(link_geometry.radius)
+            fcl_geom = fcl.Sphere(link_geometry.dimensions[SolidPrimitive.SPHERE_RADIUS])
         elif link_geometry_type == SolidPrimitive.CYLINDER:
-            fcl_geom = fcl.Cylinder(link_geometry.radius, link_geometry.height)
+            fcl_geom = fcl.Cylinder(
+                link_geometry.dimensions[SolidPrimitive.CYLINDER_RADIUS],
+                link_geometry.dimensions[SolidPrimitive.CYLINDER_HEIGHT],
+            )
         else:
             print(f"Unsupported geometry type: {link_geometry_type}")
             continue
@@ -38,9 +41,12 @@ def obstacle_to_fclobj(obstacles: SceneObstacles):
         if obstacle_geometry_type == SolidPrimitive.BOX:
             fcl_geom = fcl.Box(*obstacle_geometry.dimensions)
         elif obstacle_geometry_type == SolidPrimitive.SPHERE:
-            fcl_geom = fcl.Sphere(obstacle_geometry.radius)
+            fcl_geom = fcl.Sphere(obstacle_geometry.dimensions[SolidPrimitive.SPHERE_RADIUS])
         elif obstacle_geometry_type == SolidPrimitive.CYLINDER:
-            fcl_geom = fcl.Cylinder(obstacle_geometry.radius, obstacle_geometry.height)
+            fcl_geom = fcl.Cylinder(
+                obstacle_geometry.dimensions[SolidPrimitive.CYLINDER_RADIUS],
+                obstacle_geometry.dimensions[SolidPrimitive.CYLINDER_HEIGHT],
+            )
         else:
             print(f"Unsupported geometry type: {obstacle_geometry_type}")
             continue
