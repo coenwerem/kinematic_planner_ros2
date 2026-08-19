@@ -1,5 +1,7 @@
 # kinematic_planner_ros2
 
+![RRT* finding a collision-free path for the example 3R arm in RViz](media/rrt_star_3r_demo.gif)
+
 A suite of ROS 2 packages implementing standalone collision-free **RRT\*** and **Informed RRT\*** path planning for robot manipulators, built from the ground-up to serve as an educational complement of the more feature-rich and standard motion planning framework, [MoveIt](https://github.com/moveit/moveit2).  Collision checking uses the
 [Flexible Collision Library (FCL)](https://github.com/humanoid-path-planner/hpp-fcl) directly.
 Forward kinematics use the [Robotics Toolbox for Python](https://github.com/petercorke/robotics-toolbox-python), and the robot is described entirely by a URDF.
@@ -118,6 +120,13 @@ source install/setup.bash
 ---
 
 ## Run
+
+To watch planning happen in RViz (the view shown in the hero GIF above):
+
+```bash
+ros2 launch kinematic_planner planner.launch.py &
+rviz2 -d src/robot_3r_description/rviz/view_3r_demo.rviz
+```
 
 ### RRT\* planner (default)
 
