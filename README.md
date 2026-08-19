@@ -301,6 +301,27 @@ in its URDF `<collision>` elements.  Mesh-based collision geometry is not suppor
 
 ---
 
+## Citation
+
+If `kinematic_planner_ros2`'s planning infrastructure supported your work,
+please cite the software directly (see `CITATION.cff`), and consider
+citing the related paper below:
+
+```bibtex
+@inproceedings{enwerem2026variational,
+  title={Variational Neural Belief Parameterizations for Robust Dexterous Grasping under Multimodal Uncertainty},
+  author={Enwerem, Clinton and Kalyanaraman, Shreya and Baras, John S. and Belta, Calin},
+  booktitle={Proceedings of the IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+  year={2026},
+  eprint={2604.25897},
+  archivePrefix={arXiv},
+  primaryClass={cs.RO},
+  note={Accepted for publication}
+}
+```
+
+---
+
 ## License
 
 MIT

@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: >-
+  If this repository's planning infrastructure supported your work,
+  please cite the software directly, and consider citing the related
+  paper below.
+title: kinematic_planner_ros2
+type: software
+authors:
+  - family-names: Enwerem
+    given-names: Clinton
+license: MIT
+repository-code: https://github.com/coenwerem/kinematic_planner_ros2
+preferred-citation:
+  type: conference-paper
+  title: >-
+    Variational Neural Belief Parameterizations for Robust Dexterous
+    Grasping under Multimodal Uncertainty
+  authors:
+    - family-names: Enwerem
+      given-names: Clinton
+    - family-names: Kalyanaraman
+      given-names: Shreya
+    - family-names: Baras
+      given-names: John S.
+    - family-names: Belta
+      given-names: Calin
+  year: 2026
+  conference:
+    name: IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)
+  identifiers:
+    - type: other
+      value: "arXiv:2604.25897"
+      description: arXiv preprint
