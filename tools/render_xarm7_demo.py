@@ -48,10 +48,10 @@ START = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 MIN_OBS_DIST = 0.04
 RRTS_MAX_ITER = 2000
 RANDOM_SEED = 42
-STEPS_PER_SEGMENT = 6
+STEPS_PER_SEGMENT = 4
 PLAYBACK_FPS = 30
-START_HOLD_FRAMES = 15
-HOLD_FRAMES = 30
+START_HOLD_FRAMES = 12
+HOLD_FRAMES = 24
 OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "media")
 
 TABLE_SIZE = (1.1, 1.1, 0.4)
@@ -78,7 +78,7 @@ SCENES = {
             {"pos": (0.50, 0.0, 0.25), "size": (0.08, 0.08, 0.5)},
             {"pos": (0.20, 0.32, 0.3), "size": (0.08, 0.08, 0.6)},
         ],
-        "goal": [-0.698, -1.107, -1.0, 1.222, 0.356, -0.026, 0.373],
+        "goal": [-0.792, -0.086, 0.782, 1.563, -0.431, -0.061, -1.276],
         "out_name": "xarm7_tall",
     },
 }

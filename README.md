@@ -1,14 +1,22 @@
 # kinematic_planner_ros2
 
-![RRT* threading the 7-DOF xArm7 through a narrow-passage obstacle cluster, rendered in MuJoCo](media/xarm7_demo.gif)
+<p align="center">
+  <img src="media/xarm7_demo.gif" alt="RRT* on the xArm7, sparse obstacle scene" width="48%"/>
+  <img src="media/xarm7_tall_demo.gif" alt="RRT* on the xArm7, taller obstacle scene" width="48%"/>
+</p>
 
 A suite of ROS 2 packages implementing **RRT\*** and **Informed RRT\*** path planning for robot manipulators, built from scratch with no MoveIt dependency: collision checking runs directly against the
-[Flexible Collision Library (FCL)](https://github.com/humanoid-path-planner/hpp-fcl), forward kinematics use the [Robotics Toolbox for Python](https://github.com/petercorke/robotics-toolbox-python), and the robot is described entirely by a URDF, so any URDF-described manipulator plugs in without SRDF files or a MoveIt config package.
+[Flexible Collision Library (FCL)](https://github.com/humanoid-path-planner/hpp-fcl) (convex-primitive and mesh geometry, self-collision included), forward kinematics use the [Robotics Toolbox for Python](https://github.com/petercorke/robotics-toolbox-python), and the robot is described entirely by a URDF, so any URDF-described manipulator plugs in without SRDF files or a MoveIt config package.
 
 The planner supports any N-DOF robot whose links use **convex collision primitives**
 (box, cylinder, sphere) in their URDF `<collision>` elements — proven above on
 the 7-DOF [xArm7](#xarm7-example-7-dof) and, as a smaller reference
-example kept in the repo, a 3-DOF serial manipulator (3R arm).
+example kept in the repo, a 3-DOF serial manipulator (3R arm). The xArm7
+recordings above are driven by MuJoCo, not RViz: the same planning stack
+computes a real RRT\* solution, and MuJoCo replays the solution kinematically
+and records the render, so what the GIF shows is what the collision checker
+actually verified — see [xArm7 example](#xarm7-example-7-dof) for the
+architecture.
 
 ---
 
@@ -39,8 +47,11 @@ citing the related paper below:
 |---|---|
 | Sampling-based planning | Custom RRT\* and Informed RRT\* in `scripts/planner_node.py` and `scripts/informed_rrt_star_node.py` |
 | Collision checking | FCL bounding-volume and signed-distance modes in `collision/collision_utils.py` |
+| Robot-vs-obstacle geometry | Per-link convex primitives or triangle meshes (`trimesh` to FCL `BVHModel`) in `collision/robot_collision_model.py`, parsed straight from URDF `<collision>` elements |
+| Self-collision checking | `collision/self_collision.py`, using `RobotConfig.get_collision_pairs()` with joint-adjacent pairs auto-excluded |
 | Forward kinematics | Robotics Toolbox `ERobot` loaded from URDF |
 | Generic robot interface | `robot/robot_config.py` — parses joint limits, link names, and kinematic topology from a raw URDF string using stdlib `xml.etree`; no external config files needed |
+| MuJoCo visualization backend | `tools/render_xarm7_demo.py` drives a MuJoCo model with the planner's own RRT\* output, offscreen-rendered; no dynamics simulation, kinematic playback only |
 | Robot-agnostic obstacle scene | `scripts/obstacle_publisher.py` — all geometry parameters are ROS 2 parameters, nothing hardcoded |
 
 ---
@@ -59,8 +70,6 @@ the arm's reach:
 | `sparse` (default, hero GIF) | 3 short pillars | `media/xarm7_demo.{gif,mp4}` |
 | `tall` | 4 taller pillars, forcing the arm to duck under/around rather than mostly clear over the top | `media/xarm7_tall_demo.{gif,mp4}` |
 
-![RRT* on the xArm7 with 4 taller obstacles, forcing a lower detour](media/xarm7_tall_demo.gif)
-
 MuJoCo (not RViz or the matplotlib renderer used for the 3R demo) is the
 sim/render backend here: `tools/render_xarm7_demo.py` builds a MuJoCo model
 directly from the xArm7 URDF (MuJoCo's own URDF importer, with the visual
@@ -78,15 +87,6 @@ is meant to prove: the naive straight-line interpolation between start
 and goal is genuinely in collision (proving the obstacles forced a real
 detour), every waypoint RRT\* returned is itself collision-free, and the
 path starts and ends exactly at the requested configurations.
-
-Reproduce either recording (needs `mujoco`; see [Prerequisites](#prerequisites)):
-
-```bash
-colcon build --packages-select xarm7_description kinematic_planner_interfaces robot_3r_description kinematic_planner
-source install/setup.bash
-python3 tools/render_xarm7_demo.py --scene sparse   # default if --scene is omitted
-python3 tools/render_xarm7_demo.py --scene tall
-```
 
 `src/xarm7_description/urdf/xarm7.urdf` and its meshes are copied from the
 MIT-licensed [`frogger`](https://github.com/albertli24/frogger) project's
@@ -209,7 +209,7 @@ source install/setup.bash
 
 The 3R reference example below is the smaller 3-DOF arm bundled with the
 repo as a quick, dependency-light demo. For the 7-DOF xArm7 MuJoCo demo
-shown at the top, see [Realistic robot example: xArm7](#realistic-robot-example-xarm7).
+shown at the top, see [xArm7 example (7-DOF)](#xarm7-example-7-dof).
 
 To watch the 3R arm plan live in RViz, showing the final path as markers
 (not an animated sweep, unlike the MuJoCo demo above):
@@ -256,6 +256,19 @@ ros2 topic echo /smpb_planner/jsp_path --once
 
 You should see a `JointSpacePath` message with waypoints from the start configuration
 to the goal.
+
+### Reproducing the demo recordings
+
+```bash
+# 3R matplotlib demo
+python3 tools/render_demo.py
+
+# xArm7 MuJoCo demo (needs `mujoco`; see Prerequisites above)
+colcon build --packages-select xarm7_description kinematic_planner_interfaces robot_3r_description kinematic_planner
+source install/setup.bash
+python3 tools/render_xarm7_demo.py --scene sparse   # default if --scene is omitted
+python3 tools/render_xarm7_demo.py --scene tall
+```
 
 ---
 
