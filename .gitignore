@@ -8,5 +8,11 @@
 **/.pytest_cache/
 **.egg-info
 
-# dev
-docs
+# colcon build output
+build/
+install/
+log/
+
+# Python bytecode cache
+__pycache__/
+*.pyc
