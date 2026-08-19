@@ -84,6 +84,7 @@ class ObstaclePublisher(Node):
         self.obstacle_dict = {}
         self.first_publish = True
         self.first_marker_publish = True
+        self.first_nonbox_marker_warning = True
 
     def timer_callback(self):
         self.publish_obstacles()
@@ -145,6 +146,14 @@ class ObstaclePublisher(Node):
 
         marker_array = MarkerArray()
         for i, (obstacle, pose) in enumerate(zip(obstacles, obstacle_poses)):
+            if self.obstacle_type != "box":
+                if self.first_nonbox_marker_warning:
+                    self.get_logger().warning(
+                        f"Marker rendering is unimplemented for obstacle_type={self.obstacle_type!r} "
+                        "obstacles; skipping their markers."
+                    )
+                    self.first_nonbox_marker_warning = False
+                continue
             marker = Marker()
             marker_pose = Pose()
             marker_pose.position = pose.pose.position

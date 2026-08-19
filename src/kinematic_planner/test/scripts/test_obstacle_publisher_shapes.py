@@ -40,3 +40,10 @@ def test_cylinder_obstacle_type_publishes_cylinder_primitives():
     assert msg.scene_obstacles[0].dimensions[SolidPrimitive.CYLINDER_HEIGHT] == 0.3
     assert msg.scene_obstacles[0].dimensions[SolidPrimitive.CYLINDER_RADIUS] == 0.05
     node.destroy_node()
+
+
+def test_sphere_obstacle_type_does_not_crash_marker_publishing():
+    node = _make_publisher("sphere", [0.2], 1, [0.0, 0.5, 0.5])
+    node.build_obstacles_message()
+    node.publish_obstacle_markers()
+    node.destroy_node()
