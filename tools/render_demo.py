@@ -56,9 +56,10 @@ IS_DENSE = True
 MIN_OBS_DIST = 0.1
 RRTS_MAX_ITER = 2000
 RANDOM_SEED = 42
-STEPS_PER_SEGMENT = 5
+STEPS_PER_SEGMENT = 12
 PLAYBACK_FPS = 15
-HOLD_FRAMES = 10
+START_HOLD_FRAMES = 12
+HOLD_FRAMES = 20
 OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "media")
 
 
@@ -243,6 +244,8 @@ def main():
     print(f"Path found: {len(path)} waypoints, cost {planner.compute_path_cost(path):.3f} rad")
 
     frames_q = interpolate_waypoints([np.array(q) for q in path], STEPS_PER_SEGMENT)
+    # hold on the start pose for a beat before the sweep begins
+    frames_q = [frames_q[0]] * (START_HOLD_FRAMES - 1) + frames_q
     link_names = [n for n in link_shapes if n != robot_config.base_link_name] + [robot_config.base_link_name]
     bounds = scene_bounds(rtb_model, link_shapes, link_names, frames_q, obstacles)
 
