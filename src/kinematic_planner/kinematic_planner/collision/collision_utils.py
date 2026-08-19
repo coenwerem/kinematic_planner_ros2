@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from robot_3r_interfaces.msg import RigidBodyGeom, SceneObstacles
+from kinematic_planner_interfaces.msg import RigidBodyGeom, SceneObstacles
 from shape_msgs.msg import SolidPrimitive
 import fcl
 from geometry_msgs.msg import PoseStamped

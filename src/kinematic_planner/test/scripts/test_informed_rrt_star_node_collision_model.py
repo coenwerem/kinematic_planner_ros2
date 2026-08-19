@@ -3,7 +3,7 @@
 path, without constructing an rclpy.Node."""
 import numpy as np
 
-from robot_3r_interfaces.msg import SceneObstacles
+from kinematic_planner_interfaces.msg import SceneObstacles
 from kinematic_planner.planning.tree import TreeNode
 from kinematic_planner.robot.robot_config import RobotConfig
 from kinematic_planner.scripts.informed_rrt_star_node import build_collision_fn

@@ -9,7 +9,7 @@ import pytest
 from geometry_msgs.msg import PoseStamped
 from shape_msgs.msg import SolidPrimitive
 
-from robot_3r_interfaces.msg import SceneObstacles
+from kinematic_planner_interfaces.msg import SceneObstacles
 from kinematic_planner.collision.robot_collision_model import build_link_collision_shapes
 from kinematic_planner.planning.tree import TreeNode
 from kinematic_planner.robot.robot_config import RobotConfig

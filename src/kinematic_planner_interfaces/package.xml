@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>robot_3r_interfaces</name>
+  <name>kinematic_planner_interfaces</name>
   <version>0.0.0</version>
-  <description>The robot_3r_interfaces package.</description>
+  <description>The kinematic_planner_interfaces package.</description>
   <maintainer email="me@clintonenwerem.com">Clinton Enwerem</maintainer>
   <license>BSD</license>
 

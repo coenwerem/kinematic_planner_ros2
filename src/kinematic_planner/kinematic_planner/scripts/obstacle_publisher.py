@@ -14,7 +14,7 @@ import rclpy
 from rclpy.node import Node
 from shape_msgs.msg import SolidPrimitive
 from geometry_msgs.msg import PoseStamped, Pose
-from robot_3r_interfaces.msg import SceneObstacles
+from kinematic_planner_interfaces.msg import SceneObstacles
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import ColorRGBA

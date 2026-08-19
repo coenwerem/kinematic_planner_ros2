@@ -1,6 +1,6 @@
 from shape_msgs.msg import SolidPrimitive
 from geometry_msgs.msg import PoseStamped
-from robot_3r_interfaces.msg import SceneObstacles
+from kinematic_planner_interfaces.msg import SceneObstacles
 from kinematic_planner.collision.collision_utils import obstacle_to_fclobj
 
 

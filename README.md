@@ -42,7 +42,7 @@ kinematic_planner_ros2/
     │           ├── obstacle_publisher.py    # publishes scene obstacles
     │           └── robot_geom_publisher.py  # publishes robot link geometry from URDF
     ├── robot_3r_description/        # URDF/xacro for the example 3R robot
-    └── robot_3r_interfaces/         # custom ROS 2 message definitions
+    └── kinematic_planner_interfaces/ # custom ROS 2 message definitions
 ```
 
 ---
@@ -95,7 +95,7 @@ cd kinematic_planner_ros2
 source /opt/ros/humble/setup.bash
 
 # build all three packages
-colcon build --packages-select robot_3r_interfaces robot_3r_description kinematic_planner
+colcon build --packages-select kinematic_planner_interfaces robot_3r_description kinematic_planner
 
 # source the workspace overlay
 source install/setup.bash

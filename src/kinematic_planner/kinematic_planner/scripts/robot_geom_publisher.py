@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 from shape_msgs.msg import SolidPrimitive
 from geometry_msgs.msg import Pose, PoseStamped
 import transforms3d as t3d
-from robot_3r_interfaces.msg import RigidBodyGeom
+from kinematic_planner_interfaces.msg import RigidBodyGeom
 from rclpy.duration import Duration
 from kinematic_planner.collision.collision_utils import get_link_transform
 import spatialmath as sm

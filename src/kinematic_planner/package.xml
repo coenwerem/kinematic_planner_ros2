@@ -16,7 +16,7 @@
   <depend>shape_msgs</depend>
   <depend>visualization_msgs</depend>
   <depend>rcl_interfaces</depend>
-  <depend>robot_3r_interfaces</depend>
+  <depend>kinematic_planner_interfaces</depend>
   <depend>robot_3r_description</depend>
   <depend>trimesh</depend>
   <depend>ament_index_python</depend>

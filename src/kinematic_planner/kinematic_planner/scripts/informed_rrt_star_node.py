@@ -26,8 +26,8 @@ import tempfile
 import os
 import xml.etree.ElementTree as ET
 
-from robot_3r_interfaces.msg import JointWaypoint, JointSpacePath
-from robot_3r_interfaces.msg import SceneObstacles, RigidBodyGeom
+from kinematic_planner_interfaces.msg import JointWaypoint, JointSpacePath
+from kinematic_planner_interfaces.msg import SceneObstacles, RigidBodyGeom
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import Marker, MarkerArray
 from rcl_interfaces.msg import ParameterDescriptor
