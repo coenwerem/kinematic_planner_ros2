@@ -1,6 +1,8 @@
 # kinematic_planner_ros2
 
-![RRT* finding a collision-free path for the example 3R arm in RViz](media/rrt_star_3r_demo.gif)
+![RRT* finding a collision-free path for the example 3R arm, weaving between two obstacles](media/rrt_star_3r_demo.gif)
+
+*Rendered by `tools/render_demo.py`: a linear interpolation between the real RRT* waypoints (kinematic playback only, not a dynamics-validated trajectory), matplotlib 3D, no RViz. Regenerate the GIF, MP4, and poster with `python3 tools/render_demo.py` from a built and sourced workspace.*
 
 A suite of ROS 2 packages implementing standalone collision-free **RRT\*** and **Informed RRT\*** path planning for robot manipulators, built from the ground-up to serve as an educational complement of the more feature-rich and standard motion planning framework, [MoveIt](https://github.com/moveit/moveit2).  Collision checking uses the
 [Flexible Collision Library (FCL)](https://github.com/humanoid-path-planner/hpp-fcl) directly.
@@ -121,7 +123,8 @@ source install/setup.bash
 
 ## Run
 
-To watch planning happen in RViz (the view shown in the hero GIF above):
+To watch planning happen live in RViz, showing the final path as markers
+rather than the animated sweep the hero GIF above shows:
 
 ```bash
 ros2 launch kinematic_planner planner.launch.py &
