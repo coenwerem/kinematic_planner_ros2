@@ -24,6 +24,7 @@ import numpy as np
 import random
 import tempfile
 import os
+import xml.etree.ElementTree as ET
 
 from robot_3r_interfaces.msg import JointWaypoint, JointSpacePath
 from robot_3r_interfaces.msg import SceneObstacles, RigidBodyGeom
@@ -36,6 +37,8 @@ from typing import Dict
 
 from kinematic_planner.robot.robot_config import RobotConfig
 from kinematic_planner.collision.collision_utils import se3_to_pose_stamped
+from kinematic_planner.collision.robot_collision_model import build_link_collision_shapes
+from kinematic_planner.robot.joint_state_utils import remap_joint_state
 from kinematic_planner.planning.informed_rrt_star import InformedRRTStar
 from kinematic_planner.scripts.planner_node import build_collision_fn
 
@@ -143,6 +146,7 @@ class InformedRRTStarPlanner(Node):
         world_frame = p("world_frame").get_parameter_value().string_value
         self.robot_config = RobotConfig.from_urdf(urdf_str, disabled_pairs=disabled_pairs,
                                                    world_frame=world_frame)
+        self.link_shapes = build_link_collision_shapes(ET.fromstring(urdf_str))
         self.joint_limits = self.robot_config.joint_limits
 
         # ---- RTB model --------------------------------------------------
@@ -200,13 +204,17 @@ class InformedRRTStarPlanner(Node):
     def compute_plan(self, msg: JointState):
         if self.planning_done or self.planning_failed:
             return
-        self.start_config = msg.position
-        if self.start_config is None or self.obstacle_geom is None or self.robot_geom is None:
+        if self.obstacle_geom is None or self.robot_geom is None:
+            return
+        try:
+            self.start_config = remap_joint_state(msg, self.robot_config.joint_names)
+        except ValueError as e:
+            self.get_logger().error(str(e))
             return
 
         collision_fn = build_collision_fn(
             robot_config=self.robot_config,
-            robot_geom=self.robot_geom,
+            link_shapes=self.link_shapes,
             obstacle_geom=self.obstacle_geom,
             rtb_model=self.rtb_model,
             collision_checker=self.collision_checker,
