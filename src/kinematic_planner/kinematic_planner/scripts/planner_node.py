@@ -87,7 +87,18 @@ def build_collision_fn(robot_config, link_shapes, obstacle_geom, rtb_model,
     if not check_collision:
         return lambda _node: True
 
-    link_names = list(link_shapes.keys())
+    urdf_link_names = set(link_shapes.keys())
+    rtb_link_names = {link.name for link in rtb_model.links}
+    link_names = list(urdf_link_names & rtb_link_names)
+    unreachable_links = urdf_link_names - rtb_link_names
+    if unreachable_links:
+        logger = get_logger()
+        if logger is not None:
+            logger.error(
+                "The following URDF collision links are not reachable from the "
+                f"Robotics Toolbox model and are skipped in collision checking: "
+                f"{sorted(unreachable_links)}"
+            )
     self_collision_pairs = robot_config.get_collision_pairs()
 
     def collision_fn(candidate_node: TreeNode) -> bool:

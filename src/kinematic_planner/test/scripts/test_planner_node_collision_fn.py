@@ -107,10 +107,59 @@ def test_collision_fn_returns_false_and_logs_when_obstacle_conversion_raises():
     assert logger.errors
 
 
+class _PartialChainLink:
+    def __init__(self, name):
+        self.name = name
+
+
+class _PartialChainRTBModel:
+    """Stands in for an rtb_model that exposes fewer FK-reachable links than
+    the URDF's own <collision> elements list, e.g. a link off the main
+    serial chain. fkine() only succeeds for links in `links`; a call for
+    any other end name raises, so a regression that stops filtering
+    link_shapes down to the RTB-reachable set is caught by this test."""
+
+    links = [_PartialChainLink("link1")]
+
+    def fkine(self, q, end=None, include_base=True):
+        if end != "link1":
+            raise ValueError(f"{end} is not a valid end-effector link name")
+
+        class _SE3:
+            A = np.eye(4)
+        return _SE3()
+
+
+def test_unreachable_urdf_link_is_dropped_not_blanket_failed():
+    """Finding 1: a URDF collision link absent from rtb_model.links (e.g.
+    off the main serial chain, or any URDF/RTB naming mismatch) must be
+    dropped from collision_fn's per-waypoint FK loop and logged once at
+    build_collision_fn's construction time, not cause every candidate to
+    fail through the shared per-waypoint try/except."""
+    logger = _LoggerSpy()
+    fn = build_collision_fn(
+        robot_config=_FakeRobotConfig(),
+        link_shapes={"link1": [], "link_off_chain": []},
+        obstacle_geom=_FakeObstacleGeom(),
+        rtb_model=_PartialChainRTBModel(),
+        collision_checker="proximity",
+        min_obs_dist=0.1,
+        check_collision=True,
+        get_logger=lambda: logger,
+    )
+    node = TreeNode(np.array([0.0, 0.0, 0.0]))
+    node.path_q = [node.q]
+    assert fn(node) is True
+    assert logger.errors
+    assert any("link_off_chain" in msg for msg in logger.errors)
+
+
 class _SucceedingRTBModel:
     """Stands in for an rtb_model whose fkine() succeeds trivially, so
     collision_fn reaches the self-collision layer without tripping the
     per-link FK fail-safe above it."""
+
+    links = [_RaisingLink()]  # name "link1", matching link_shapes below
 
     def fkine(self, q, end=None, include_base=True):
         class _SE3:

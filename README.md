@@ -26,10 +26,10 @@ The planner supports any N-DOF robot whose links use **convex collision primitiv
 
 ```
 kinematic_planner_ros2/
-├── launch/
-│   └── planner.launch.py            # single entry point; wires all three nodes
 └── src/
     ├── kinematic_planner/           # main package — planner, collision, robot model
+    │   ├── launch/
+    │   │   └── planner.launch.py    # single entry point; connects all three nodes
     │   └── kinematic_planner/
     │       ├── robot/
     │       │   ├── robot_config.py  # RobotConfig dataclass; from_urdf() classmethod
@@ -108,19 +108,19 @@ source install/setup.bash
 ### RRT\* planner (default)
 
 ```bash
-ros2 launch launch/planner.launch.py
+ros2 launch kinematic_planner planner.launch.py
 ```
 
 Plan to a specific goal configuration:
 
 ```bash
-ros2 launch launch/planner.launch.py goal_config:="[1.5093, 0.6072, 1.4052]"
+ros2 launch kinematic_planner planner.launch.py goal_config:="[1.5093, 0.6072, 1.4052]"
 ```
 
 Enable the dense obstacle ring (10 obstacles arranged in a circle around the robot):
 
 ```bash
-ros2 launch launch/planner.launch.py is_dense:=true
+ros2 launch kinematic_planner planner.launch.py is_dense:=true
 ```
 
 ### Informed RRT\* planner
@@ -183,19 +183,23 @@ All parameters can be overridden at runtime with `--ros-args -p <name>:=<value>`
 | `collision_checker` | `proximity` | `proximity` or `bvol` |
 | `min_obs_dist` | `0.1` | Minimum safe clearance from obstacles (metres) |
 | `random_seed` | `42` | Seed for reproducible results |
-| `disabled_collision_pairs` | `[""]` | Self-collision pairs to skip, as `"link_a:link_b"` strings |
+| `disabled_collision_pairs` | `[""]` | Additional self-collision pairs to skip beyond the joint-adjacent pairs `RobotConfig.from_urdf` already auto-excludes, as `"link_a:link_b"` strings |
 
 ---
 
 ## Using a different robot
 
 1. Add your URDF or xacro to the workspace (or point to an existing package).
-2. Edit `launch/planner.launch.py` — change `urdf_file` to your robot's xacro path.
-3. Set `disabled_collision_pairs` to the adjacent link pairs you want to exclude from
-   self-collision checking (equivalent to `<disable_collisions>` entries in an SRDF):
+2. Edit `src/kinematic_planner/launch/planner.launch.py` — change `urdf_file` to your robot's xacro path.
+3. `RobotConfig.from_urdf` auto-excludes every joint-adjacent link pair from self-collision
+   checking, computed from the URDF's own joint parent/child structure, so no manual listing
+   of adjacent pairs is required. Use `disabled_collision_pairs` only for further exclusions
+   on top of the automatic adjacency exclusion, e.g. non-adjacent link pairs your robot's
+   geometry makes intentionally non-colliding (equivalent to extra `<disable_collisions>`
+   entries in an SRDF):
    ```bash
-   ros2 launch launch/planner.launch.py \
-     disabled_collision_pairs:="['base_link:link1','link1:link2','link2:link3']"
+   ros2 launch kinematic_planner planner.launch.py \
+     disabled_collision_pairs:="['base_link:link3']"
    ```
 4. Set `dense_platform_height` to match your robot's first link height if using
    the dense obstacle mode.
