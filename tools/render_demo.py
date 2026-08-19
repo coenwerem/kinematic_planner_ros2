@@ -128,15 +128,19 @@ def parse_link_colors(urdf_root) -> dict:
     return link_colors
 
 
-def _lighten_if_too_dark(hex_color, min_channel_max=90, blend_toward_white=0.4):
+def _lighten_if_too_dark(hex_color, min_channel_max=90, brightness_boost=70):
     """The URDF's real materials include near-black/dark-grey links (link0,
     base_link) that would be nearly invisible against a dark render
-    background; blend those toward white a bit while keeping the hue
-    recognizable, and leave already-visible colors untouched."""
+    background; add a fixed brightness boost to those rather than a
+    proportional blend toward white, since link0 (black) and base_link
+    (dark grey) need to stay visually distinct from each other (link0 is
+    a pedestal sitting on top of base_link), and a proportional blend
+    compresses two already-close dark colors even closer together.
+    Colors already visible against the background are left untouched."""
     r, g, b = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
     if max(r, g, b) >= min_channel_max:
         return hex_color
-    r, g, b = (int(c + (255 - c) * blend_toward_white) for c in (r, g, b))
+    r, g, b = (min(255, c + brightness_boost) for c in (r, g, b))
     return "#{:02x}{:02x}{:02x}".format(r, g, b)
 
 
@@ -168,10 +172,18 @@ def link_boxes_world(rtb_model, link_shapes, link_names, q):
     return boxes
 
 
-def scene_bounds(rtb_model, link_shapes, link_names, frames_q, obstacles):
-    """Axis-aligned bounds covering every link box across the whole
-    animation plus the (static) obstacles, so the camera framing never
-    clips or jumps between frames."""
+def ee_positions(rtb_model, frames_q):
+    """End-effector (tool_link) world position at every interpolated
+    frame, matching the real ee_path marker planner_node.py publishes
+    (rtb_model.fkine(q) with no end= argument picks the kinematic
+    chain's terminal link)."""
+    return [rtb_model.fkine(q, include_base=True).A[:3, 3] for q in frames_q]
+
+
+def scene_bounds(rtb_model, link_shapes, link_names, frames_q, obstacles, ee_path):
+    """Axis-aligned bounds covering every link box, the end-effector path,
+    and the (static) obstacles across the whole animation, so the camera
+    framing never clips or jumps between frames."""
     corners = []
     for q in frames_q:
         for _, center, size, rotation in link_boxes_world(rtb_model, link_shapes, link_names, q):
@@ -180,22 +192,44 @@ def scene_bounds(rtb_model, link_shapes, link_names, frames_q, obstacles):
     for pos, size in obstacles:
         for face in box_faces(pos, size):
             corners.extend(face)
+    corners.extend(ee_path)
     corners = np.array(corners)
     return corners.min(axis=0), corners.max(axis=0)
 
 
-def draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, obstacles, bounds):
+VIEW_ELEV, VIEW_AZIM = 24, -50
+
+
+def _camera_direction():
+    elev, azim = np.radians(VIEW_ELEV), np.radians(VIEW_AZIM)
+    return np.array([np.cos(elev) * np.cos(azim), np.cos(elev) * np.sin(azim), np.sin(elev)])
+
+
+def draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, obstacles, ee_path_so_far, bounds):
     ax.clear()
-    for link_name, center, size, rotation in link_boxes_world(rtb_model, link_shapes, link_names, q):
+    # matplotlib's Poly3DCollection z-ordering is a rough painter's algorithm
+    # (per-collection centroid, not a real depth buffer) and gets small
+    # objects sitting flush on a large flat face -- like link0 resting on
+    # base_link's top -- backwards. Draw explicitly farthest-from-camera
+    # first so nearer boxes always occlude farther ones correctly.
+    view_dir = _camera_direction()
+    boxes = list(link_boxes_world(rtb_model, link_shapes, link_names, q))
+    boxes = [(name, c, s, r, "link") for name, c, s, r in boxes]
+    boxes += [(None, np.array(pos), size, np.eye(3), "obstacle") for pos, size in obstacles]
+    boxes.sort(key=lambda b: np.dot(b[1], view_dir))
+    for link_name, center, size, rotation, kind in boxes:
         faces = box_faces(center, size, rotation)
-        ax.add_collection3d(Poly3DCollection(
-            faces, facecolor=link_colors[link_name], edgecolor="#10131a", linewidths=0.6, alpha=0.95,
-        ))
-    for pos, size in obstacles:
-        faces = box_faces(pos, size)
-        ax.add_collection3d(Poly3DCollection(
-            faces, facecolor="#e0872a", edgecolor="#7a4712", linewidths=0.6, alpha=0.9,
-        ))
+        if kind == "link":
+            ax.add_collection3d(Poly3DCollection(
+                faces, facecolor=link_colors[link_name], edgecolor="#10131a", linewidths=0.6, alpha=0.95,
+            ))
+        else:
+            ax.add_collection3d(Poly3DCollection(
+                faces, facecolor="#e0872a", edgecolor="#7a4712", linewidths=0.6, alpha=0.9,
+            ))
+    if len(ee_path_so_far) > 1:
+        pts = np.array(ee_path_so_far)
+        ax.plot(pts[:, 0], pts[:, 1], pts[:, 2], color="#3ddc4a", linewidth=2.0)
     lo, hi = bounds
     pad = 0.08 * np.max(hi - lo)
     ax.set_xlim(lo[0] - pad, hi[0] + pad)
@@ -203,7 +237,7 @@ def draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, obstacles
     ax.set_zlim(0.0, hi[2] + pad)
     extent = hi - lo
     ax.set_box_aspect((extent[0] + 2 * pad, extent[1] + 2 * pad, hi[2] + pad))
-    ax.view_init(elev=24, azim=-50)
+    ax.view_init(elev=VIEW_ELEV, azim=VIEW_AZIM)
     ax.set_axis_off()
     for pane in (ax.xaxis.pane, ax.yaxis.pane, ax.zaxis.pane):
         pane.set_alpha(0.0)
@@ -247,17 +281,22 @@ def main():
     # hold on the start pose for a beat before the sweep begins
     frames_q = [frames_q[0]] * (START_HOLD_FRAMES - 1) + frames_q
     link_names = [n for n in link_shapes if n != robot_config.base_link_name] + [robot_config.base_link_name]
-    bounds = scene_bounds(rtb_model, link_shapes, link_names, frames_q, obstacles)
+    ee_path = ee_positions(rtb_model, frames_q)
+    bounds = scene_bounds(rtb_model, link_shapes, link_names, frames_q, obstacles, ee_path)
 
     fig = plt.figure(figsize=(8, 6), dpi=110)
     fig.patch.set_facecolor("#1c1f26")
     ax = fig.add_axes([-0.1, -0.02, 1.2, 1.15], projection="3d")
+    # matplotlib's automatic z-order computation gets small objects sitting
+    # flush on large flat faces backwards (see draw_scene); disabling it
+    # makes the explicit camera-distance sort in draw_scene actually apply.
+    ax.computed_zorder = False
     ax.set_facecolor("#1c1f26")
     frame_paths = []
     frame_dir = os.path.join(OUT_DIR, "_frames")
     os.makedirs(frame_dir, exist_ok=True)
     for i, q in enumerate(frames_q):
-        draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, obstacles, bounds)
+        draw_scene(ax, rtb_model, link_shapes, link_names, link_colors, q, obstacles, ee_path[:i + 1], bounds)
         path_png = os.path.join(frame_dir, f"frame_{i:04d}.png")
         fig.savefig(path_png, facecolor="#1c1f26")
         frame_paths.append(path_png)
