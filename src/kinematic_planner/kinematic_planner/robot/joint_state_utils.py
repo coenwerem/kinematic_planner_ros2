@@ -13,6 +13,11 @@ from sensor_msgs.msg import JointState
 
 
 def remap_joint_state(msg: JointState, joint_names: List[str]) -> np.ndarray:
+    if len(msg.name) != len(msg.position):
+        raise ValueError(
+            f"JointState message has {len(msg.name)} names but {len(msg.position)} positions; "
+            f"the two arrays must be the same length."
+        )
     name_to_position = dict(zip(msg.name, msg.position))
     missing = [name for name in joint_names if name not in name_to_position]
     if missing:

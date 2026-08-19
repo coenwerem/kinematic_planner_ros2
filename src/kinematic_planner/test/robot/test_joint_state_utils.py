@@ -27,3 +27,11 @@ def test_remap_raises_value_error_naming_every_missing_joint():
     msg.position = [1.5]
     with pytest.raises(ValueError, match="joint_2"):
         remap_joint_state(msg, joint_names=["joint_1", "joint_2", "joint_3"])
+
+
+def test_remap_raises_value_error_on_name_position_length_mismatch():
+    msg = JointState()
+    msg.name = ["joint_1", "joint_2"]
+    msg.position = [1.0]
+    with pytest.raises(ValueError, match="2 names but 1 positions"):
+        remap_joint_state(msg, joint_names=["joint_1", "joint_2"])
