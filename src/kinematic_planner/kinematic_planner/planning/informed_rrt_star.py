@@ -115,7 +115,10 @@ class InformedRRTStar(RRTPlannerBase):
                 return rnd
         return np.clip(rnd, low, high)
 
-    def plan(self) -> Optional[List[np.ndarray]]:
+    def plan(
+        self,
+        on_iteration: Optional[Callable[[int, float], None]] = None,
+    ) -> Optional[List[np.ndarray]]:
         start_ok = self.collision_fn(self.start)
         end_ok = self.collision_fn(self.end)
         if not start_ok:
@@ -128,7 +131,7 @@ class InformedRRTStar(RRTPlannerBase):
         best_path = None
         self.config_tree = [self.start]
 
-        for _ in range(self.max_iter):
+        for i in range(self.max_iter):
             rnd_arr = self.informed_sample()
             rnd_node = TreeNode(rnd_arr)
             nearest_ind = self.get_nearest_node_index(self.config_tree, rnd_node)
@@ -149,6 +152,9 @@ class InformedRRTStar(RRTPlannerBase):
                             self.c_best = temp_cost
                             best_path = temp_path
                             self.compute_ellipse_params()
+
+            if on_iteration is not None:
+                on_iteration(i, self.c_best)
 
             found_and_can_stop = (not self.search_until_max_iter) and (best_path is not None)
             if found_and_can_stop:

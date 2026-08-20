@@ -58,7 +58,10 @@ class RRTStar(RRTPlannerBase):
         samp = [self.rng.uniform(lo, hi) for lo, hi in self.joint_limits]
         return TreeNode(np.array(samp))
 
-    def plan(self) -> Optional[List[np.ndarray]]:
+    def plan(
+        self,
+        on_iteration: Optional[Callable[[int, float], None]] = None,
+    ) -> Optional[List[np.ndarray]]:
         start_ok = self.collision_fn(self.start)
         end_ok = self.collision_fn(self.end)
         if not start_ok:
@@ -69,16 +72,27 @@ class RRTStar(RRTPlannerBase):
             return None
 
         self.config_tree = [self.start]
-        for _ in range(self.max_iter):
+        best_cost = float("inf")
+        for i in range(self.max_iter):
             rnd_node = self.sample_free()
             nearest_ind = self.get_nearest_node_index(self.config_tree, rnd_node)
             new_node = self.steer(self.config_tree[nearest_ind], rnd_node)
+            added = False
             if new_node is not None and self.collision_fn(new_node):
                 near_inds = self.get_nearby_neighbors(new_node)
                 new_node = self.choose_best_parent(new_node, near_inds)
                 if new_node is not None:
                     self.config_tree.append(new_node)
                     self.rewire(new_node, near_inds)
+                    added = True
+
+            if on_iteration is not None:
+                if added:
+                    last_index = self.find_best_goal_node(self.end)
+                    if last_index is not None:
+                        path = self.generate_final_course(last_index, self.end)
+                        best_cost = min(best_cost, self.compute_path_cost(path))
+                on_iteration(i, best_cost)
 
             if not self.search_until_max_iter:
                 last_index = self.find_best_goal_node(self.end)

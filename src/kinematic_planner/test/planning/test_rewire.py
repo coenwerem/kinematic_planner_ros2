@@ -58,6 +58,7 @@ def test_rewire_propagates_cost_to_preexisting_grandchildren():
 
     grandchild = TreeNode(np.array([2.0]))
     grandchild.parent = near_node
+    near_node.children.append(grandchild)
     grandchild.cost = 101.0  # stale near_node.cost (100) plus edge distance (1)
 
     base.config_tree = [new_node, near_node, grandchild]

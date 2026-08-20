@@ -19,6 +19,10 @@ class TreeNode:
         self.parent: Optional["TreeNode"] = None
         self.cost: float = 0.0
         self.path_q: List[np.ndarray] = []
+        # Maintained only at the two points a node's parent becomes part of
+        # the tree (choose_best_parent, rewire's reparenting) -- transient
+        # candidates steer() builds and discards never touch this list.
+        self.children: List["TreeNode"] = []
 
 
 def edge_distance(from_node: TreeNode, to_node: TreeNode) -> float:
@@ -60,6 +64,18 @@ class RRTPlannerBase:
         dists = [np.sum((node.q - rnd_node.q) ** 2) for node in config_tree]
         return int(np.argmin(dists))
 
+    # The near-radius formula assumes roughly uniform sample density. Once
+    # informed sampling concentrates points in a shrinking ellipse, that
+    # assumption breaks: a radius sized for n samples spread over the whole
+    # joint-limit volume instead catches most of the tree in the dense
+    # region, and choose_best_parent/rewire's cost (and propagate_cost_to_
+    # leaves's recursive fan-out) scale with how many neighbors come back.
+    # Capping to the closest MAX_NEAR_NEIGHBORS keeps each iteration bounded
+    # regardless of local density; RRT*'s near-optimality argument only
+    # needs a neighbor set that grows with n, not the single largest one
+    # the radius formula happens to admit.
+    MAX_NEAR_NEIGHBORS = 30
+
     def get_nearby_neighbors(self, x_new: TreeNode) -> List[int]:
         assert self.connect_circle_dist > 2 * (1 + 1 / self.dimension) ** (1 / self.dimension), \
             "connect_circle_dist too small for the RRT* near-radius formula"
@@ -71,7 +87,14 @@ class RRTPlannerBase:
             if self.expand_dist:
                 near_radius = min(near_radius, self.expand_dist)
         dists = [np.sum((nd.q - x_new.q) ** 2) for nd in self.config_tree]
-        return [i for i, d in enumerate(dists) if d <= near_radius ** 2]
+        near = [i for i, d in enumerate(dists) if d <= near_radius ** 2]
+        if len(near) <= self.MAX_NEAR_NEIGHBORS:
+            return near
+        # Only when actually truncating does distance order (not tree
+        # insertion order) matter -- reordering unconditionally changed
+        # rewire's sequential rewiring outcome even when nothing was cut.
+        near.sort(key=lambda i: dists[i])
+        return near[: self.MAX_NEAR_NEIGHBORS]
 
     def steer(self, x_nearest: TreeNode, x_random: TreeNode) -> Optional[TreeNode]:
         start = np.array(x_nearest.q, dtype=float)
@@ -102,6 +125,7 @@ class RRTPlannerBase:
             if cand is not None and self.collision_fn(cand):
                 cand.parent = nearest
                 cand.cost = calc_new_cost(nearest, cand)
+                nearest.children.append(cand)
                 return cand
             return None
 
@@ -118,6 +142,7 @@ class RRTPlannerBase:
         if min_cost == float("inf"):
             return None
         best_cand.cost = min_cost
+        best_cand.parent.children.append(best_cand)
         return best_cand
 
     def rewire(self, new_node: TreeNode, near_inds: List[int]) -> None:
@@ -130,16 +155,19 @@ class RRTPlannerBase:
                 continue
             new_cost = calc_new_cost(new_node, near_node)
             if new_cost < near_node.cost:
+                old_parent = near_node.parent
+                if old_parent is not None:
+                    old_parent.children.remove(near_node)
                 near_node.parent = new_node
                 near_node.cost = new_cost
                 near_node.path_q = cand.path_q
+                new_node.children.append(near_node)
                 self.propagate_cost_to_leaves(near_node)
 
     def propagate_cost_to_leaves(self, parent_node: TreeNode) -> None:
-        for node in self.config_tree:
-            if node.parent is parent_node:
-                node.cost = calc_new_cost(parent_node, node)
-                self.propagate_cost_to_leaves(node)
+        for node in parent_node.children:
+            node.cost = calc_new_cost(parent_node, node)
+            self.propagate_cost_to_leaves(node)
 
     def find_best_goal_node(self, end_node: TreeNode) -> Optional[int]:
         dist_to_goal = [edge_distance(nd, end_node) for nd in self.config_tree]

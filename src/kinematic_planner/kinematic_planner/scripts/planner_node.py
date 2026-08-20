@@ -83,6 +83,12 @@ def build_collision_fn(robot_config, link_shapes, obstacle_geom, rtb_model,
     frame. Self-collision runs alongside robot-obstacle checking through
     the same per-waypoint FK, using RobotConfig.get_collision_pairs() for
     the pairs to check.
+
+    obstacle_geom is fixed for the lifetime of the returned closure (a
+    fresh collision_fn is built per planning attempt), so its FCL objects
+    are converted once here rather than on every candidate check -- with
+    thousands of checks per plan, re-parsing the same static obstacle
+    geometry every call was the dominant collision_fn cost.
     """
     if not check_collision:
         return lambda _node: True
@@ -101,15 +107,15 @@ def build_collision_fn(robot_config, link_shapes, obstacle_geom, rtb_model,
             )
     self_collision_pairs = robot_config.get_collision_pairs()
 
-    def collision_fn(candidate_node: TreeNode) -> bool:
-        try:
-            obs_fcl_objects = list(obstacle_to_fclobj(obstacles=obstacle_geom))
-        except Exception as e:
-            logger = get_logger()
-            if logger is not None:
-                logger.error(f"Error converting obstacle geometry: {e}")
-            return False
+    try:
+        obs_fcl_objects = list(obstacle_to_fclobj(obstacles=obstacle_geom))
+    except Exception as e:
+        logger = get_logger()
+        if logger is not None:
+            logger.error(f"Error converting obstacle geometry: {e}")
+        return lambda _node: False
 
+    def collision_fn(candidate_node: TreeNode) -> bool:
         for q in candidate_node.path_q:
             rtb_model.q = q
             link_fcl_objects = {}
