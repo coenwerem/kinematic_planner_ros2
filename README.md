@@ -70,17 +70,9 @@ The bundled xArm7 collision model uses convex primitives. Triangle-mesh collisio
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    U["URDF / xacro"] --> R["RobotConfig + collision geometry"]
-    J["/joint_states"] --> P["RRT* / Informed RRT*"]
-    O["Scene obstacles"] --> C["FCL validity checker"]
-    R --> P
-    R --> C
-    P <--> C
-    P --> Q["JointSpacePath"]
-    Q --> V["RViz markers / MuJoCo playback"]
-```
+<p align="center">
+  <img src="media/architecture.svg" alt="Architecture of kinematic_planner_ros2 showing URDF, joint-state, and obstacle inputs feeding the planner and FCL validity checker, followed by JointSpacePath output and RViz or MuJoCo visualization" width="100%"/>
+</p>
 
 The planning algorithms live in ROS-independent modules under `kinematic_planner/planning/`. ROS 2 nodes translate robot state and scene messages into planner inputs and publish the resulting joint-space path.
 
