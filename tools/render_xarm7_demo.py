@@ -60,9 +60,11 @@ TABLE_POS = (0.0, 0.0, -0.2)
 # Three scenes, same table: "sparse" is 3 short obstacles (the easy case),
 # "tall" is fewer obstacles than an earlier 7-pillar attempt (found too
 # hard to read visually) but each one taller, so the arm has to duck
-# under/around rather than mostly clear over the top, and "dense" is 6
-# short obstacles (more clutter, same height as "sparse") with a goal
-# chosen for a short path despite the added clutter.
+# under/around rather than mostly clear over the top -- its goal is on the
+# far side of the cluster, so its path is long; "steps_per_segment" plays
+# that long detour back faster without changing the other scenes' pace.
+# "dense" is 6 short obstacles (more clutter, same height as "sparse")
+# with a goal chosen for a short path despite the added clutter.
 SCENES = {
     "sparse": {
         "obstacles": [
@@ -80,8 +82,9 @@ SCENES = {
             {"pos": (0.50, 0.0, 0.25), "size": (0.08, 0.08, 0.5)},
             {"pos": (0.20, 0.32, 0.3), "size": (0.08, 0.08, 0.6)},
         ],
-        "goal": [0.084, -0.74, -0.122, 0.011, 0.654, -0.842, -0.64],
+        "goal": [-0.792, -0.086, 0.782, 1.563, -0.431, -0.061, -1.276],
         "out_name": "xarm7_tall",
+        "steps_per_segment": 2,
     },
     "dense": {
         "obstacles": [
@@ -247,7 +250,8 @@ def main():
     print(f"Path found: {len(path)} waypoints, cost {planner.compute_path_cost(path):.3f} rad")
     verify_demo_claims(path, goal, robot_config, collision_fn)
 
-    frames_q = interpolate_waypoints([np.array(q) for q in path], STEPS_PER_SEGMENT)
+    steps_per_segment = scene.get("steps_per_segment", STEPS_PER_SEGMENT)
+    frames_q = interpolate_waypoints([np.array(q) for q in path], steps_per_segment)
     frames_q = [frames_q[0]] * (START_HOLD_FRAMES - 1) + frames_q
     frames_q = frames_q + [frames_q[-1]] * HOLD_FRAMES
 
