@@ -24,7 +24,6 @@ jobs:
             python3-colcon-common-extensions \
             python3-rosdep \
             libfcl-dev
-          rm -rf /var/lib/apt/lists/*
 
       - name: Resolve ROS dependencies with rosdep
         run: |
