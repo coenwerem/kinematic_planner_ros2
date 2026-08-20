@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/coenwerem/kinematic_planner_ros2/actions/workflows/ci.yml/badge.svg)](https://github.com/coenwerem/kinematic_planner_ros2/actions/workflows/ci.yml)
 
-**ROS 2-native sampling-based motion planning for robot manipulators, implemented from first principles.**
+**A transparent ROS 2 sampling-based motion-planning stack built as a complement to MoveIt 2.**
 
-`kinematic_planner_ros2` provides RRT* and Informed RRT* joint-space planning, URDF-driven robot modeling, FCL-based environment and self-collision checking, and reproducible simulation demos without a MoveIt dependency. The planner core is ROS-independent; ROS 2 nodes provide the robot, scene, and path interfaces around it.
+`kinematic_planner_ros2` implements RRT* and Informed RRT* joint-space planning, URDF-driven robot modeling, and FCL-based environment and self-collision checking from first principles. It is designed to complement [MoveIt 2](https://moveit.picknik.ai/) by exposing the planning machinery that a full-featured framework necessarily abstracts behind higher-level interfaces: sampling, nearest-neighbor expansion, rewiring, path validation, collision geometry, and ROS 2 integration. The planner core is ROS-independent, while ROS 2 nodes provide robot-state, scene, visualization, and path interfaces around it.
 
 <p align="center">
   <img src="media/xarm7_demo.gif" alt="RRT* planning for the 7-DOF xArm7 in a sparse obstacle scene" width="48%"/>
@@ -13,6 +13,7 @@
 
 ### Highlights
 
+- **A readable complement to MoveIt 2**: the core planner, collision checker, robot model, and ROS boundary remain explicit and inspectable end to end.
 - **RRT\*** and **Informed RRT\*** implemented directly in Python with rewiring, deterministic sampling, and convergence instrumentation.
 - **N-DOF URDF manipulators** with joint limits and kinematic topology parsed directly from the robot description.
 - **FCL collision checking** for robot-obstacle and self-collision queries, including primitive and triangle-mesh collision geometry.
@@ -20,7 +21,7 @@
 - **7-DOF xArm7 validation** in cluttered scenes, with MuJoCo used to replay and render the planner's verified paths.
 - **Reproducible benchmarks and CI** covering planner behavior, collision geometry, self-collision, joint ordering, and launch selection.
 
-> This project is intentionally MoveIt-independent so the sampling, tree rewiring, collision checking, and robot-model interfaces remain explicit and inspectable. It is not intended to replace MoveIt or OMPL.
+> **Relationship to MoveIt 2:** this repository is not a replacement for MoveIt 2 or OMPL. MoveIt 2 provides the broader planning, scene-management, trajectory-processing, execution, and plugin infrastructure expected from a mature robotics framework. `kinematic_planner_ros2` intentionally keeps a narrower surface area so the mechanics of sampling-based manipulator planning can be studied, tested, and modified directly.
 
 ---
 
@@ -344,7 +345,7 @@ The custom FK/Jacobian/IK implementation in `robot/legacy/urdf_parser.py` is ret
 
 ## Scope
 
-This package focuses on **kinematic joint-space planning**. It currently does not provide:
+This package focuses on **kinematic joint-space planning** and deliberately complements rather than reproduces the broader MoveIt 2 stack. It currently does not provide:
 
 - trajectory time parameterization,
 - kinodynamic planning,
@@ -353,7 +354,7 @@ This package focuses on **kinematic joint-space planning**. It currently does no
 - MoveIt planner-plugin integration, or
 - explicit planning-group selection for branched robots.
 
-These boundaries are intentional. The repository is meant to expose and test the core sampling-based planning and collision machinery directly.
+These boundaries are intentional: the repository keeps the planner and collision pipeline small enough to inspect end to end, while remaining close to the concepts and interfaces a user encounters in MoveIt 2 and OMPL-based manipulation planning.
 
 ---
 
