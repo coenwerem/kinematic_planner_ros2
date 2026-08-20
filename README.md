@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/coenwerem/kinematic_planner_ros2/actions/workflows/ci.yml/badge.svg)](https://github.com/coenwerem/kinematic_planner_ros2/actions/workflows/ci.yml)
 
-**A ROS 2 research and teaching toolkit for sampling-based manipulator motion planning.**
+**A research-oriented ROS 2 toolkit for sampling-based manipulator motion planning.**
 
 `kinematic_planner_ros2` implements RRT* and Informed RRT* joint-space planning, URDF-driven robot modeling, and FCL-based environment and self-collision checking from first principles. The implementation keeps sampling, nearest-neighbor expansion, rewiring, path validation, collision geometry, and ROS 2 integration explicit, making the stack useful for studying, testing, and extending sampling-based planning methods. The planner core has no ROS dependency. ROS 2 nodes wrap it with robot-state, scene, visualization, and path interfaces.
 
