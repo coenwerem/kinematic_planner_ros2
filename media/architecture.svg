@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
+  <title id="title">kinematic_planner_ros2 architecture</title>
+  <desc id="desc">URDF, joint states, and scene obstacles feed robot configuration, RRT star or Informed RRT star planning, and FCL validity checking. The planner publishes a JointSpacePath for RViz or MuJoCo playback.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#475569"/>
+    </marker>
+    <style>
+      .section { font: 600 18px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #475569; letter-spacing: 0.04em; }
+      .label { font: 600 19px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #0f172a; }
+      .sublabel { font: 400 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #475569; }
+      .box { fill: #ffffff; stroke: #94a3b8; stroke-width: 2; }
+      .core { fill: #f8fafc; stroke: #64748b; stroke-width: 2; }
+      .edge { fill: none; stroke: #475569; stroke-width: 2.4; marker-end: url(#arrow); }
+      .bi { fill: none; stroke: #475569; stroke-width: 2.4; marker-start: url(#arrow); marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1200" height="520" fill="#ffffff"/>
+
+  <text class="section" x="80" y="54">INPUTS</text>
+  <text class="section" x="455" y="54">PLANNING CORE</text>
+  <text class="section" x="925" y="54">OUTPUTS</text>
+
+  <rect class="box" x="55" y="95" width="245" height="78" rx="12"/>
+  <text class="label" x="177.5" y="127" text-anchor="middle">URDF / xacro</text>
+  <text class="sublabel" x="177.5" y="151" text-anchor="middle">robot description</text>
+
+  <rect class="box" x="55" y="221" width="245" height="78" rx="12"/>
+  <text class="label" x="177.5" y="253" text-anchor="middle">/joint_states</text>
+  <text class="sublabel" x="177.5" y="277" text-anchor="middle">current configuration</text>
+
+  <rect class="box" x="55" y="347" width="245" height="78" rx="12"/>
+  <text class="label" x="177.5" y="379" text-anchor="middle">Scene Obstacles</text>
+  <text class="sublabel" x="177.5" y="403" text-anchor="middle">environment geometry</text>
+
+  <rect class="core" x="410" y="88" width="300" height="92" rx="14"/>
+  <text class="label" x="560" y="124" text-anchor="middle">RobotConfig</text>
+  <text class="sublabel" x="560" y="151" text-anchor="middle">kinematics + collision geometry</text>
+
+  <rect class="core" x="410" y="214" width="300" height="92" rx="14"/>
+  <text class="label" x="560" y="250" text-anchor="middle">RRT* / Informed RRT*</text>
+  <text class="sublabel" x="560" y="277" text-anchor="middle">sampling, expansion, rewiring</text>
+
+  <rect class="core" x="410" y="340" width="300" height="92" rx="14"/>
+  <text class="label" x="560" y="376" text-anchor="middle">FCL Validity Checker</text>
+  <text class="sublabel" x="560" y="403" text-anchor="middle">environment + self-collision</text>
+
+  <rect class="box" x="860" y="187" width="275" height="82" rx="12"/>
+  <text class="label" x="997.5" y="221" text-anchor="middle">JointSpacePath</text>
+  <text class="sublabel" x="997.5" y="246" text-anchor="middle">planned configuration sequence</text>
+
+  <rect class="box" x="860" y="313" width="275" height="82" rx="12"/>
+  <text class="label" x="997.5" y="347" text-anchor="middle">RViz / MuJoCo</text>
+  <text class="sublabel" x="997.5" y="372" text-anchor="middle">visualization and playback</text>
+
+  <path class="edge" d="M300 134 H410"/>
+  <path class="edge" d="M300 260 H410"/>
+  <path class="edge" d="M300 386 H410"/>
+
+  <path class="edge" d="M560 180 V214"/>
+  <path class="edge" d="M710 134 H765 V386 H710"/>
+  <path class="bi" d="M560 306 V340"/>
+
+  <path class="edge" d="M710 260 H860"/>
+  <path class="edge" d="M997.5 269 V313"/>
+
+  <text class="sublabel" x="778" y="244" text-anchor="middle">robot model</text>
+</svg>
