@@ -4,7 +4,7 @@
 
 **A transparent ROS 2 sampling-based motion-planning stack built as a complement to MoveIt 2.**
 
-`kinematic_planner_ros2` implements RRT* and Informed RRT* joint-space planning, URDF-driven robot modeling, and FCL-based environment and self-collision checking from first principles. It is designed to complement [MoveIt 2](https://moveit.picknik.ai/) by exposing the planning machinery that a full-featured framework necessarily abstracts behind higher-level interfaces: sampling, nearest-neighbor expansion, rewiring, path validation, collision geometry, and ROS 2 integration. The planner core is ROS-independent, while ROS 2 nodes provide robot-state, scene, visualization, and path interfaces around it.
+`kinematic_planner_ros2` implements RRT* and Informed RRT* joint-space planning, URDF-driven robot modeling, and FCL-based environment and self-collision checking from first principles. It is designed to complement [MoveIt 2](https://moveit.picknik.ai/) by exposing the planning machinery that a full-featured framework necessarily abstracts behind higher-level interfaces: sampling, nearest-neighbor expansion, rewiring, path validation, collision geometry, and ROS 2 integration. The planner core has no ROS dependency. ROS 2 nodes wrap it with robot-state, scene, visualization, and path interfaces.
 
 <p align="center">
   <img src="media/xarm7_demo.gif" alt="RRT* planning for the 7-DOF xArm7 in a sparse obstacle scene" width="48%"/>
@@ -21,7 +21,7 @@
 - **7-DOF xArm7 validation** in cluttered scenes, with MuJoCo used to replay and render the planner's verified paths.
 - **Reproducible benchmarks and CI** covering planner behavior, collision geometry, self-collision, joint ordering, and launch selection.
 
-> **Relationship to MoveIt 2:** this repository is not a replacement for MoveIt 2 or OMPL. MoveIt 2 provides the broader planning, scene-management, trajectory-processing, execution, and plugin infrastructure expected from a mature robotics framework. `kinematic_planner_ros2` intentionally keeps a narrower surface area so the mechanics of sampling-based manipulator planning can be studied, tested, and modified directly.
+> **Relationship to MoveIt 2:** MoveIt 2 provides the broader planning, scene-management, trajectory-processing, execution, and plugin infrastructure expected from a mature robotics framework. `kinematic_planner_ros2` occupies a narrower layer, keeping the mechanics of sampling-based manipulator planning exposed so they can be studied, tested, and modified directly.
 
 ---
 
@@ -41,7 +41,7 @@ For each recording, `tools/render_xarm7_demo.py` verifies that:
 2. every returned planner waypoint is collision-free, and
 3. the path starts and terminates at the requested configurations.
 
-The MuJoCo playback is **kinematic visualization**, not dynamics validation. The renderer sets joint positions along the planned trajectory directly, so the demo makes no claim about torque limits, contact forces, tracking error, or time parameterization.
+The MuJoCo playback provides **kinematic visualization**. Dynamics validation falls outside this demo because the renderer sets joint positions along the planned trajectory directly. Torque limits, contact forces, tracking error, and time parameterization are therefore outside the validation scope.
 
 The bundled xArm7 collision model uses convex primitives. Triangle-mesh collision support is implemented in `collision/robot_collision_model.py` and exercised independently by the collision-model tests.
 
@@ -96,7 +96,7 @@ python3 tools/benchmark_planners.py --trials 20 --max-iter 800
   <img src="media/benchmark_convergence.png" alt="RRT* and Informed RRT* convergence over 20 seeded trials" width="78%"/>
 </p>
 
-The benchmark reports joint-space path cost in radians. It is intended to expose convergence behavior rather than claim a general wall-clock speedup.
+The benchmark reports joint-space path cost in radians and focuses specifically on convergence behavior. Wall-clock performance depends on the robot, collision geometry, scene complexity, and hardware.
 
 ---
 
@@ -236,7 +236,7 @@ ros2 launch kinematic_planner planner.launch.py \
 
 ## Using Another Robot
 
-The planner is designed around URDF-described manipulators rather than robot-specific Python classes.
+Robot-specific Python classes are unnecessary because the planner derives its model from the URDF.
 
 To add another robot:
 
@@ -245,7 +245,7 @@ To add another robot:
 3. Provide any additional non-adjacent self-collision exclusions through `disabled_collision_pairs` if required.
 4. Set the example scene's `platform_height` if using the bundled obstacle publisher.
 
-The collision model accepts primitive and triangle-mesh URDF collision geometry. The current planner operates in the full joint space exposed by the URDF; explicit planning-group selection for large branched robots is outside the current scope.
+The collision model accepts primitive and triangle-mesh URDF collision geometry. The current planner operates in the full joint space exposed by the URDF. Explicit planning-group selection for large branched robots is outside the current scope.
 
 ---
 
@@ -337,7 +337,7 @@ kinematic_planner_ros2/
 └── media/
 ```
 
-The custom FK/Jacobian/IK implementation in `robot/legacy/urdf_parser.py` is retained as an educational reference and is not part of the runtime planning path.
+The custom FK/Jacobian/IK implementation in `robot/legacy/urdf_parser.py` is retained as an educational reference. Runtime planning uses the modules under `planning/`, `collision/`, and `robot/robot_config.py`.
 
 </details>
 
@@ -345,7 +345,7 @@ The custom FK/Jacobian/IK implementation in `robot/legacy/urdf_parser.py` is ret
 
 ## Scope
 
-This package focuses on **kinematic joint-space planning** and deliberately complements rather than reproduces the broader MoveIt 2 stack. It currently does not provide:
+This package focuses on **kinematic joint-space planning**. Its scope is deliberately narrower than MoveIt 2, isolating the planner and collision layers for direct inspection. It currently does not provide:
 
 - trajectory time parameterization,
 - kinodynamic planning,
@@ -354,7 +354,7 @@ This package focuses on **kinematic joint-space planning** and deliberately comp
 - MoveIt planner-plugin integration, or
 - explicit planning-group selection for branched robots.
 
-These boundaries are intentional: the repository keeps the planner and collision pipeline small enough to inspect end to end, while remaining close to the concepts and interfaces a user encounters in MoveIt 2 and OMPL-based manipulation planning.
+These boundaries keep the planner and collision pipeline small enough to inspect end to end. The design still tracks the concepts and interfaces encountered in MoveIt 2 and OMPL-based manipulation planning.
 
 ---
 
