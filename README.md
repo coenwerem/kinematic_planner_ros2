@@ -71,6 +71,7 @@ the arm's reach:
 |---|---|---|
 | `sparse` (default, hero GIF) | 3 short pillars | `media/xarm7_demo.{gif,mp4}` |
 | `tall` | 4 taller pillars, forcing the arm to duck under/around rather than mostly clear over the top | `media/xarm7_tall_demo.{gif,mp4}` |
+| `dense` | 6 short pillars, same height as `sparse` but more clutter, with a goal chosen for a short path | `media/xarm7_dense_demo.{gif,mp4}` |
 
 MuJoCo (not RViz or the matplotlib renderer used for the 3R demo) is the
 sim/render backend here: `tools/render_xarm7_demo.py` builds a MuJoCo model
@@ -270,6 +271,7 @@ colcon build --packages-select xarm7_description kinematic_planner_interfaces ro
 source install/setup.bash
 python3 tools/render_xarm7_demo.py --scene sparse   # default if --scene is omitted
 python3 tools/render_xarm7_demo.py --scene tall
+python3 tools/render_xarm7_demo.py --scene dense
 ```
 
 ---
