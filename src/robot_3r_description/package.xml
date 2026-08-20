@@ -3,9 +3,9 @@
 <package format="3">
   <name>robot_3r_description</name>
   <version>0.0.0</version>
-  <description>The robot_3r_description package.</description>
+  <description>URDF/xacro description of the bundled 3-DOF reference arm used by the kinematic_planner demos.</description>
   <maintainer email="me@clintonenwerem.com">Clinton Enwerem</maintainer>
-  <license>BSD</license>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

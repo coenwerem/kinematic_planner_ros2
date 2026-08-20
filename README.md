@@ -1,5 +1,7 @@
 # kinematic_planner_ros2
 
+[![CI](https://github.com/coenwerem/kinematic_planner_ros2/actions/workflows/ci.yml/badge.svg)](https://github.com/coenwerem/kinematic_planner_ros2/actions/workflows/ci.yml)
+
 <p align="center">
   <img src="media/xarm7_demo.gif" alt="RRT* on the xArm7, sparse obstacle scene" width="48%"/>
   <img src="media/xarm7_tall_demo.gif" alt="RRT* on the xArm7, taller obstacle scene" width="48%"/>

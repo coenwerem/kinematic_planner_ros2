@@ -3,9 +3,9 @@
 <package format="3">
   <name>kinematic_planner_interfaces</name>
   <version>0.0.0</version>
-  <description>The kinematic_planner_interfaces package.</description>
+  <description>Custom ROS 2 message definitions for kinematic_planner.</description>
   <maintainer email="me@clintonenwerem.com">Clinton Enwerem</maintainer>
-  <license>BSD</license>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
