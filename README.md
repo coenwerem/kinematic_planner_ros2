@@ -4,7 +4,7 @@
 
 **A research-oriented ROS 2 toolkit for sampling-based manipulator motion planning.**
 
-`kinematic_planner_ros2` implements RRT* and Informed RRT* joint-space planning, URDF-driven robot modeling, and FCL-based environment and self-collision checking from first principles. The implementation keeps sampling, nearest-neighbor expansion, rewiring, path validation, collision geometry, and ROS 2 integration explicit, making the stack useful for studying, testing, and extending sampling-based planning methods. The planner core has no ROS dependency. ROS 2 nodes wrap it with robot-state, scene, visualization, and path interfaces.
+`kinematic_planner_ros2` implements RRT* and Informed RRT* joint-space planning, URDF-driven robot modeling, and FCL-based environment and self-collision checking from first principles. Our implementation keeps sampling, nearest-neighbor expansion, rewiring, path validation, collision geometry, and ROS 2 integration explicit, making the stack useful for studying, testing, and extending sampling-based planning methods. The core planner class also does not depend on ROS; the bundled ROS 2 nodes only wrap the core class with robot-state, scene, visualization, and path interfaces.
 
 <p align="center">
   <img src="media/xarm7_demo.gif" alt="RRT* planning for the 7-DOF xArm7 in a sparse obstacle scene" width="48%"/>
@@ -21,12 +21,11 @@
 - **7-DOF xArm7 validation** in cluttered scenes, with MuJoCo used to replay and render the planner's verified paths.
 - **Reproducible benchmarks and CI** covering planner behavior, collision geometry, self-collision, joint ordering, and launch selection.
 
-> **Project scope:** this repository is intended for research, teaching, and experimentation with sampling-based manipulator planning. It focuses on the planner and collision pipeline and does not attempt to provide the broader trajectory-processing, execution, plugin, and scene-management surface expected from production motion-planning software.
+> **Project scope:** this repository is intended for research, teaching, and experimentation with sampling-based manipulator planning. It focuses on the planner and collision pipeline and does not attempt to provide the broader trajectory-processing, execution, plugin, and scene-management features native to production motion-planning software.
 
 ---
 
 ## Citation
-
 If `kinematic_planner_ros2`'s planning infrastructure supported your work,
 please cite the software directly (see `CITATION.cff`), and consider
 citing the related paper below:
@@ -47,8 +46,7 @@ citing the related paper below:
 ---
 
 ## Demo
-
-The xArm7 demos use the same planner and FCL validity checker as the ROS 2 package. MuJoCo is used only to replay the resulting joint-space path and render it offscreen.
+Our released xArm7 demos use the same planner and FCL validity checker as the ROS 2 package. We use MuJoCo as a visualization tool to animate the joint-space path produced by our planner.
 
 | Scene | Planning Problem | Media |
 |---|---|---|
@@ -69,7 +67,6 @@ The bundled xArm7 collision model uses convex primitives. Triangle-mesh collisio
 ---
 
 ## Architecture
-
 <p align="center">
   <img src="media/architecture.svg" alt="Architecture of kinematic_planner_ros2 showing URDF, joint-state, and obstacle inputs feeding the planner and FCL validity checker, followed by JointSpacePath output and RViz or MuJoCo visualization" width="100%"/>
 </p>
@@ -77,7 +74,6 @@ The bundled xArm7 collision model uses convex primitives. Triangle-mesh collisio
 The planning algorithms live in ROS-independent modules under `kinematic_planner/planning/`. ROS 2 nodes translate robot state and scene messages into planner inputs and publish the resulting joint-space path.
 
 ### Core Components
-
 | Capability | Implementation |
 |---|---|
 | RRT* | `planning/rrt_star.py` |
@@ -96,7 +92,6 @@ The planning algorithms live in ROS-independent modules under `kinematic_planner
 ---
 
 ## Benchmark
-
 `tools/benchmark_planners.py` compares RRT* and Informed RRT* on the bundled 3R dense-obstacle scene over 20 deterministic seeds and 800 iterations per trial.
 
 Both planners sample uniformly until the first solution. In the recorded benchmark, **11/20 trials** found a solution within the iteration budget. After the first solution, Informed RRT* restricts sampling to its current admissible ellipsoid and achieved a lower final path cost than RRT* in every solved trial.
@@ -114,17 +109,16 @@ The benchmark reports joint-space path cost in radians and focuses specifically 
 ---
 
 ## Quick Start
-
-### Requirements
-
-Tested on:
+### Prerequisites
+The bundled package was tested on a development environment with the following specs:
 
 - Ubuntu 24.04 (Noble)
 - ROS 2 Jazzy
 - Python 3
 - FCL / `python-fcl`
 
-Install the ROS and FCL system dependencies:
+### Installation Instructions
+- Install the ROS and FCL system dependencies:
 
 ```bash
 sudo apt install \
@@ -134,8 +128,7 @@ sudo apt install \
   libfcl-dev
 ```
 
-Install the Python dependencies:
-
+- Install the Python dependencies:
 ```bash
 pip install \
   "roboticstoolbox-python>=1.3.1" \
@@ -147,14 +140,12 @@ pip install \
   "numpy>=2.0"
 ```
 
-MuJoCo and `imageio` are needed only to reproduce the rendered demos:
-
+- For rendering the generated path, install MuJoCo and `imageio`:
 ```bash
 pip install mujoco imageio
 ```
 
 ### Build
-
 ```bash
 git clone https://github.com/coenwerem/kinematic_planner_ros2.git
 cd kinematic_planner_ros2
@@ -163,34 +154,36 @@ colcon build
 source install/setup.bash
 ```
 
-### Run RRT*
+### Usage Examples
+
+- Run RRT* with a default (non-colliding) goal configuration:
 
 ```bash
 ros2 launch kinematic_planner planner.launch.py
 ```
 
-Plan to another goal configuration:
+- Plan to a specific goal configuration:
 
 ```bash
 ros2 launch kinematic_planner planner.launch.py \
   goal_config:="[1.5, -0.3, 0.6]"
 ```
 
-### Run Informed RRT*
+- Run Informed RRT*:
 
 ```bash
 ros2 launch kinematic_planner planner.launch.py \
   algorithm:=informed_rrt_star
 ```
 
-### Visualize the 3R Reference Example
+- Visualize the Path for a Simple [3R Robot](https://www.icck.org/filebob/uploads/storage/TICPS_20ExTHlOTSu7T8lUy.pdf):
 
 ```bash
 ros2 launch kinematic_planner planner.launch.py &
 rviz2 -d src/robot_3r_description/rviz/view_3r_demo.rviz
 ```
 
-### Inspect the Published Path
+- Inspect the Published Path
 
 ```bash
 ros2 topic echo /smpb_planner/jsp_path --once
@@ -199,9 +192,9 @@ ros2 topic echo /smpb_planner/jsp_path --once
 ---
 
 ## Reproduce the xArm7 Demos
+There are two robot models bundled with the released code: a 3R serial chain and a 7-DoF xArm7 robot arm. The former serves as a compact reference and test case, while the latter serves as a test platform for demonstrating the capabilities of our planning stack on a standard robotic arm. Below, we provide commands for visualizing example paths generated with both robot models.
 
-The 3R model is retained as a compact reference and test case. The xArm7 is the realistic 7-DOF demonstration of the same planning stack.
-
+- Begin by building the packages in your ROS 2 workspace:
 ```bash
 colcon build --packages-select \
   xarm7_description \
@@ -209,14 +202,15 @@ colcon build --packages-select \
   robot_3r_description \
   kinematic_planner
 source install/setup.bash
-
+```
+- Run the xArm7 demo like so:
+```
 python3 tools/render_xarm7_demo.py --scene sparse
 python3 tools/render_xarm7_demo.py --scene tall
 python3 tools/render_xarm7_demo.py --scene dense
 ```
 
-For the lightweight 3R recording:
-
+- For the 3R robot, run:
 ```bash
 python3 tools/render_demo.py
 ```
@@ -226,8 +220,7 @@ python3 tools/render_demo.py
 ---
 
 ## Collision Model
-
-Robot collision geometry is constructed directly from each URDF `<collision>` element. The collision layer supports:
+In our implementation, we construct robot collision geometry from each URDF `<collision>` element, and our collision-checking module supports:
 
 - boxes,
 - spheres,
@@ -248,23 +241,21 @@ ros2 launch kinematic_planner planner.launch.py \
 ---
 
 ## Using Another Robot
-
-Robot-specific Python classes are unnecessary because the planner derives its model from the URDF.
+Robot-specific Python classes are unnecessary because our planner derives its model from the URDF.
 
 To add another robot:
 
 1. Add or depend on the robot's URDF/xacro package.
-2. Point a launch file at that robot description and pass it to the planner through `robot_description`.
-3. Provide any additional non-adjacent self-collision exclusions through `disabled_collision_pairs` if required.
+2. Point a launch file at the robot description, and pass it to the planner through `robot_description`.
+3. Provide any additional non-adjacent self-collision exclusions through `disabled_collision_pairs` (optional).
 4. Set the example scene's `platform_height` if using the bundled obstacle publisher.
 
-The collision model accepts primitive and triangle-mesh URDF collision geometry. The current planner operates in the full joint space exposed by the URDF. Explicit planning-group selection for large branched robots is outside the current scope.
+Our collision model accepts primitive and triangle-mesh URDF collision geometry. The planner also operates in the full joint space exposed by the URDF. Explicit planning-group selection for large branched robots is outside the project's current scope.
 
 ---
 
 ## ROS 2 Interface
-
-The default launch file brings up the robot description, joint-state source, robot geometry publisher, obstacle publisher, and the selected planner.
+The bundled ROS 2 packages contain a default launch file for bringing up the robot description, joint-state source, robot geometry publisher, obstacle publisher, and a planner of choice.
 
 <details>
 <summary><strong>Launch Arguments</strong></summary>
@@ -309,7 +300,6 @@ The default launch file brings up the robot description, joint-state source, rob
 ---
 
 ## Testing
-
 Run the package tests after building and sourcing the workspace:
 
 ```bash
@@ -324,7 +314,6 @@ CI is defined in `.github/workflows/ci.yml`.
 ---
 
 ## Project Structure
-
 <details>
 <summary><strong>Repository Layout</strong></summary>
 
@@ -350,14 +339,13 @@ kinematic_planner_ros2/
 └── media/
 ```
 
-The custom FK/Jacobian/IK implementation in `robot/legacy/urdf_parser.py` is retained as an educational reference. Runtime planning uses the modules under `planning/`, `collision/`, and `robot/robot_config.py`.
+Note that the module `robot/legacy/urdf_parser.py` contains a custom FK/Jacobian/IK implementation and is released as an educational reference. However, runtime planning for the planner core and ROS 2 wrapper uses the modules under `planning/`, `collision/`, and `robot/robot_config.py`.
 
 </details>
 
 ---
 
 ## Scope
-
 This package focuses on **kinematic joint-space sampling-based planning** for research, teaching, and experimentation. Its current scope covers planner construction, URDF-derived robot models, collision checking, ROS 2 interfaces, simulation playback, and reproducible benchmarks. It currently does not provide:
 
 - trajectory time parameterization,
@@ -367,16 +355,14 @@ This package focuses on **kinematic joint-space sampling-based planning** for re
 - MoveIt planner-plugin integration, or
 - explicit planning-group selection for branched robots.
 
-These boundaries keep the planner and collision pipeline small enough to inspect end to end and make it practical to modify individual planning components without carrying a production framework's full integration surface.
+These boundaries keep the planner and collision pipeline small enough to inspect in their entirety and make it practical to modify individual planning components, a task that might be considerably more challenging with production planning frameworks.
 
 ---
 
 ## References
-
-- S. Karaman and E. Frazzoli, “Sampling-based algorithms for optimal motion planning,” *IJRR*, 2011.
+- S. Karaman and E. Frazzoli, “Sampling-Based Algorithms for Optimal Motion Planning,” *IJRR*, 2011.
 - J. D. Gammell, S. S. Srinivasa, and T. D. Barfoot, “Informed RRT*: Optimal Sampling-based Path Planning Focused via Direct Sampling of an Admissible Ellipsoidal Heuristic,” *IROS*, 2014.
-- Planner implementation structure was initially adapted from [AtsushiSakai/PythonRobotics](https://github.com/AtsushiSakai/PythonRobotics) and subsequently generalized for ROS 2 manipulator planning.
+- The underlying planning algorithms in our implementation were initially adapted from [AtsushiSakai/PythonRobotics](https://github.com/AtsushiSakai/PythonRobotics) and subsequently generalized for ROS2-compliant manipulator planning.
 
 ## License
-
 MIT. See [`LICENSE`](LICENSE).
