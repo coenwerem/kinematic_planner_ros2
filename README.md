@@ -347,6 +347,30 @@ in its URDF `<collision>` elements.  Mesh-based collision geometry is not suppor
 
 ---
 
+## Benchmark
+
+`tools/benchmark_planners.py` runs RRT\* and Informed RRT\* on the 3R
+arm's dense obstacle scene (`tools/render_demo.py`'s `IS_DENSE=True`
+scene and goal), 20 seeded trials each, 800 iterations per trial,
+recording the best path cost found so far at every iteration via
+`RRTStar.plan()`/`InformedRRTStar.plan()`'s `on_iteration` callback.
+
+Both algorithms sample uniformly (no goal bias) until a first solution
+is found, so they share the same solve rate at a given iteration budget
+by construction: 11/20 trials solved within 800 iterations here. After
+finding a first solution the two diverge: Informed RRT\* keeps sampling
+inside the shrinking ellipsoid its current best solution defines, RRT\*
+keeps sampling uniformly, and Informed RRT\* ends up at a lower final
+cost in every trial that solved. Reproduce with:
+
+```bash
+python3 tools/benchmark_planners.py --trials 20 --max-iter 800
+```
+
+![RRT* vs Informed RRT* convergence, 20 trials, 3R dense scene](media/benchmark_convergence.png)
+
+---
+
 ## License
 
 MIT
