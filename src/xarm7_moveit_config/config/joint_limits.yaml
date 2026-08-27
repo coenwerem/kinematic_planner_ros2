@@ -1,0 +1,15 @@
+# Velocity limits mirror the URDF. Acceleration limits are added here because
+# Pilz refuses to plan without them, and CHOMP and STOMP use them for time
+# parameterization. Values are conservative and identical across joints so no
+# planner gains an advantage from asymmetric limits.
+default_velocity_scaling_factor: 1.0
+default_acceleration_scaling_factor: 1.0
+
+joint_limits:
+  joint1: {has_velocity_limits: true, max_velocity: 3.14, has_acceleration_limits: true, max_acceleration: 5.0}
+  joint2: {has_velocity_limits: true, max_velocity: 3.14, has_acceleration_limits: true, max_acceleration: 5.0}
+  joint3: {has_velocity_limits: true, max_velocity: 3.14, has_acceleration_limits: true, max_acceleration: 5.0}
+  joint4: {has_velocity_limits: true, max_velocity: 3.14, has_acceleration_limits: true, max_acceleration: 5.0}
+  joint5: {has_velocity_limits: true, max_velocity: 3.14, has_acceleration_limits: true, max_acceleration: 5.0}
+  joint6: {has_velocity_limits: true, max_velocity: 3.14, has_acceleration_limits: true, max_acceleration: 5.0}
+  joint7: {has_velocity_limits: true, max_velocity: 3.14, has_acceleration_limits: true, max_acceleration: 5.0}

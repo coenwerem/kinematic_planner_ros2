@@ -58,7 +58,7 @@ TABLE_SIZE = (1.1, 1.1, 0.4)
 TABLE_POS = (0.0, 0.0, -0.2)
 
 # Three scenes, same table: "sparse" is 3 short obstacles (the easy case),
-# "tall" is fewer obstacles than an earlier 7-pillar attempt (found too
+# "tall" is fewer obstacles than an earlier 7-obstacle attempt (found too
 # hard to read visually) but each one taller, so the arm has to duck
 # under/around rather than mostly clear over the top -- its goal is on the
 # far side of the cluster, so its path is long; "steps_per_segment" plays

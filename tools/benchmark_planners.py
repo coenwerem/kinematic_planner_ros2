@@ -21,9 +21,44 @@ import sys
 for _name in [n for n in sys.modules if n == "mpl_toolkits" or n.startswith("mpl_toolkits.")]:
     del sys.modules[_name]
 
+import warnings
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+import matplotlib.font_manager as _fm
+import matplotlib.gridspec as gridspec
+from pathlib import Path as _Path
+
+for _f in ("/usr/share/fonts/truetype/cmu/cmunsx.ttf",
+           "/usr/share/fonts/truetype/cmu/cmunss.ttf"):
+    if _Path(_f).exists():
+        _fm.fontManager.addfont(_f)
+
+plt.rcParams.update({
+    "font.family":        "sans-serif",
+    "font.sans-serif":    ["CMU Sans Serif", "DejaVu Sans", "Arial"],
+    "font.size":          13,
+    "axes.labelsize":     18,
+    "axes.titlesize":     20,
+    "axes.titleweight":   "bold",
+    "axes.labelweight":   "normal",
+    "axes.spines.top":    True,
+    "axes.spines.right":  True,
+    "axes.linewidth":     1,
+    "legend.fontsize":    12,
+    "xtick.labelsize":    14,
+    "ytick.labelsize":    14,
+    "figure.dpi":         600,
+    "grid.alpha":         0.12,
+    "grid.linewidth":     0.3,
+    "text.usetex":        False,
+    "axes.unicode_minus": False,
+    "axes.facecolor":     "white",
+    "figure.facecolor":   "white",
+    "savefig.facecolor":  "white",
+})
 import numpy as np
 import xml.etree.ElementTree as ET
 
@@ -146,25 +181,39 @@ def main():
         solved = np.isfinite(runs[:, -1]).sum()
         print(f"{name}: {solved}/{args.trials} trials solved by iteration {args.max_iter}")
 
-    fig, ax = plt.subplots(figsize=(8, 5))
-    colors = {"RRT*": "#2f6fb0", "Informed RRT*": "#d9722c"}
+    fig = plt.figure(figsize=(9.0, 5.2))
+    gs = gridspec.GridSpec(1, 1, figure=fig,
+                           left=0.12, right=0.985, bottom=0.14, top=0.92)
+    ax = fig.add_subplot(gs[0, 0])
+    ax.set_facecolor("white")
+    fig.patch.set_facecolor("white")
+    colors = {"RRT*": "#bf360c", "Informed RRT*": "#0d47a1"}
     for name, runs in results.items():
-        mean_cost = np.nanmean(np.where(np.isfinite(runs), runs, np.nan), axis=0)
+        finite = np.where(np.isfinite(runs), runs, np.nan)
         iters = np.arange(runs.shape[1])
-        ax.plot(iters, mean_cost, label=name, color=colors[name], linewidth=2)
-        for row in runs:
-            ax.plot(iters, row, color=colors[name], alpha=0.08, linewidth=1)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            median = np.nanmedian(finite, axis=0)
+            lo = np.nanpercentile(finite, 25, axis=0)
+            hi = np.nanpercentile(finite, 75, axis=0)
+        solved = int(np.isfinite(runs[:, -1]).sum())
+        ax.fill_between(iters, lo, hi, color=colors[name], alpha=0.16, linewidth=0)
+        ax.plot(iters, median, color=colors[name], linewidth=2.2,
+                label=f"{name}  ({solved}/{args.trials} solved)")
 
-    ax.set_xlabel("Iteration")
-    ax.set_ylabel("Best path cost so far (rad)")
-    ax.set_title(f"RRT* vs Informed RRT* convergence ({args.trials} trials, 3R dense scene)")
-    ax.legend()
-    ax.grid(alpha=0.3)
-    fig.tight_layout()
-
-    plot_path = os.path.join(args.out_dir, "benchmark_convergence.png")
-    fig.savefig(plot_path, dpi=150)
-    print(f"wrote {plot_path}")
+    ax.set_xlabel("iteration", fontsize=18)
+    ax.set_ylabel("best path cost so far (rad)", fontsize=18)
+    ax.set_title("Convergence on the 3R dense-obstacle scene", fontsize=20, fontweight="bold")
+    ax.tick_params(labelsize=14)
+    ax.legend(frameon=False, loc="upper right")
+    ax.grid(axis="both")
+    ax.set_axisbelow(True)
+    png_path = os.path.join(args.out_dir, "benchmark_convergence.png")
+    pdf_path = os.path.join(args.out_dir, "benchmark_convergence.pdf")
+    fig.savefig(png_path, dpi=600, bbox_inches="tight", facecolor="white", pad_inches=0.02)
+    fig.savefig(pdf_path, bbox_inches="tight", facecolor="white", pad_inches=0.02)
+    print(f"wrote {png_path}")
+    print(f"wrote {pdf_path}")
 
 
 if __name__ == "__main__":

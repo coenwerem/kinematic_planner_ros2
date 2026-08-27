@@ -20,7 +20,13 @@ import fcl
 import numpy as np
 import spatialmath as sm
 import trimesh
-from ament_index_python.packages import get_package_share_directory
+
+# Imported at module level so tests can patch it, and guarded so that URDFs with
+# primitive collision geometry or absolute mesh paths import without ROS.
+try:
+    from ament_index_python.packages import get_package_share_directory
+except ImportError:  # pragma: no cover - exercised only outside a ROS workspace
+    get_package_share_directory = None
 
 
 @dataclass
@@ -37,6 +43,12 @@ def resolve_ros_package_uri(uri: str) -> str:
         return uri
     rest = uri[len("package://"):]
     pkg_name, _, rel_path = rest.partition("/")
+    if get_package_share_directory is None:
+        raise RuntimeError(
+            f"resolving {uri!r} needs the ament index, which is unavailable "
+            "outside a sourced ROS 2 workspace. Use absolute mesh paths or "
+            "primitive collision geometry for ROS-free use."
+        )
     pkg_share = get_package_share_directory(pkg_name)
     return os.path.join(pkg_share, rel_path)
 

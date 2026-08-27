@@ -17,5 +17,8 @@ log/
 __pycache__/
 *.pyc
 
-# internal dev/planning notes, not part of the public deliverable
+# internal dev/planning notes
 docs/
+
+# recorded benchmark measurements
+results/

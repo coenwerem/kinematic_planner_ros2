@@ -2,6 +2,7 @@
 """Exercises build_collision_fn directly, without constructing an
 rclpy.Node, matching the release spec's requirement that planner-
 algorithm tests not require an rclpy graph."""
+import kinematic_planner.collision.validity as validity_module
 from kinematic_planner.scripts.planner_node import build_collision_fn
 from kinematic_planner.planning.tree import TreeNode
 import numpy as np
@@ -177,7 +178,7 @@ def test_collision_fn_returns_false_and_logs_when_self_collision_check_raises(mo
     def _raising_check_self_collision(link_fcl_objects, collision_pairs):
         raise RuntimeError("self-collision check failed")
 
-    monkeypatch.setattr(planner_node_module, "check_self_collision", _raising_check_self_collision)
+    monkeypatch.setattr(validity_module, "check_self_collision", _raising_check_self_collision)
 
     logger = _LoggerSpy()
     fn = build_collision_fn(

@@ -1,0 +1,15 @@
+planning_plugins:
+  - chomp_interface/CHOMPPlanner
+request_adapters:
+  - default_planning_request_adapters/ResolveConstraintFrames
+  - default_planning_request_adapters/ValidateWorkspaceBounds
+  - default_planning_request_adapters/CheckStartStateBounds
+  - default_planning_request_adapters/CheckStartStateCollision
+response_adapters:
+  - default_planning_response_adapters/AddTimeOptimalParameterization
+  - default_planning_response_adapters/ValidateSolution
+enable_failure_recovery: true
+ridge_factor: 0.01
+jiggle_fraction: 0.05
+collision_clearence: 0.2
+collision_threshold: 0.07
