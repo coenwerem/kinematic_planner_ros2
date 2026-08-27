@@ -462,7 +462,8 @@ above; it does not expose the `kinematic_planner` RRT* as a MoveIt planner plugi
 
 ## Citation
 
-Software citation metadata is in `CITATION.cff`. A related paper by the same author:
+Software citation metadata is in `CITATION.cff`. The planner computed joint-space paths offline
+for the experiments in:
 
 ```bibtex
 @inproceedings{enwerem2026variational,

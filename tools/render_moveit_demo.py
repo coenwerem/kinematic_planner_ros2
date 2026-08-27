@@ -7,7 +7,7 @@ replays three motions for the same start, goal, and obstacle set, side by side
 and frame-synchronized:
 
     1. direct joint interpolation, which drives the arm through an obstacle;
-    2. this repository's RRT*;
+    2. the kinematic_planner RRT*;
     3. the shortest MoveIt solution on the query.
 
 Every frame of every panel is checked with the repository's FCL collision
@@ -177,7 +177,7 @@ def main():
         {"title": "Direct interpolation",
          "sub": f"{data['straight_line_in_collision']}/{data['straight_line_samples']} waypoints in collision",
          "path": [start, goal]},
-        {"title": "RRT* (this repository)",
+        {"title": "RRT* (kinematic_planner)",
          "sub": f"collision-free, {local['path_length_rad']:.2f} rad",
          "path": local["trajectory"]},
         {"title": best_moveit["planner"].split("/")[-1] + " (MoveIt 2)",

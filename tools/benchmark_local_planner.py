@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run this repository's RRT* on the query used by the MoveIt comparison.
+"""Run the kinematic_planner RRT* on the query used by the MoveIt comparison.
 
 `benchmark_moveit_planners.py` measures MoveIt's pipelines through move_group.
 This script solves the same start, goal, and obstacle set with the planner and
@@ -153,7 +153,7 @@ def main():
         print(f"  trial {trial}: {elapsed:.1f} s, cost {costs[-1]:.3f} rad, {len(path)} waypoints")
 
     row = {
-        "planner": "RRT* (this repository)",
+        "planner": "RRT* (kinematic_planner)",
         "pipeline": "kinematic_planner",
         "successes": solved,
         "trials": args.trials,

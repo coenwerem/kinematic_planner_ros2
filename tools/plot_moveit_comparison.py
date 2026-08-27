@@ -55,8 +55,8 @@ C_NEUTRAL = "#9e9e9e"    # no solution
 
 
 def short(label):
-    if "this repository" in label:
-        return "RRT*\n(this repo)"
+    if "kinematic_planner" in label:
+        return "RRT*\n(kinematic_planner)"
     return label.split("/")[-1]
 
 
@@ -158,7 +158,7 @@ def render(data, out_png, out_pdf):
     if local:
         handles.append(plt.Rectangle((0, 0), 1, 1, facecolor="white",
                                      edgecolor="black", linewidth=0.7, hatch="//"))
-        labels.append("this repository (Python)")
+        labels.append("kinematic_planner (Python)")
     fig.legend(handles, labels, loc="lower center", ncol=len(labels),
                frameon=False, bbox_to_anchor=(0.5, -0.05))
 

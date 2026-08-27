@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare the MoveIt planning pipelines with this repository's own planners.
+"""Compare the MoveIt planning pipelines with the kinematic_planner RRT*.
 
 tools/benchmark_planners.py compares the in-repo RRT* and Informed RRT*
 implementations against each other. This script plans one blocked start-to-goal
